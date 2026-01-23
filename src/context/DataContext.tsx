@@ -20,6 +20,8 @@ interface DataContextType {
   selectedVesselId: string | null;
   setSelectedVesselId: (id: string | null) => void;
   addIncident: (incident: Omit<Incident, 'id'>) => Incident;
+  addVessel: (vessel: Omit<Vessel, 'id'>) => Vessel;
+  addPatrol: (patrol: Omit<Patrol, 'id'>) => Patrol;
   getVesselById: (id: string) => Vessel | undefined;
   getPatrolById: (id: string) => Patrol | undefined;
   getIncidentById: (id: string) => Incident | undefined;
@@ -33,7 +35,7 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [vessels, setVessels] = useState<Vessel[]>(createInitialVessels);
   const [trackPoints, setTrackPoints] = useState<TrackPoint[]>(createInitialTrackPoints);
-  const [patrols] = useState<Patrol[]>(createInitialPatrols);
+  const [patrols, setPatrols] = useState<Patrol[]>(createInitialPatrols);
   const [incidents, setIncidents] = useState<Incident[]>(createInitialIncidents);
   const [selectedVesselId, setSelectedVesselId] = useState<string | null>(null);
 
@@ -66,6 +68,42 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     setIncidents(prev => [newIncident, ...prev]);
     return newIncident;
+  }, []);
+
+  const addVessel = useCallback((vesselData: Omit<Vessel, 'id'>): Vessel => {
+    const newVessel: Vessel = {
+      ...vesselData,
+      id: `v-${Date.now()}`,
+    };
+    setVessels(prev => [newVessel, ...prev]);
+    setTrackPoints(prev => [
+      ...prev,
+      {
+        vesselId: newVessel.id,
+        lat: newVessel.lastPosition.lat,
+        lon: newVessel.lastPosition.lon,
+        timestamp: newVessel.lastPosition.timestamp,
+      },
+    ]);
+    return newVessel;
+  }, []);
+
+  const addPatrol = useCallback((patrolData: Omit<Patrol, 'id'>): Patrol => {
+    const newPatrol: Patrol = {
+      ...patrolData,
+      id: `p-${Date.now()}`,
+    };
+    setPatrols(prev => [newPatrol, ...prev]);
+    if (newPatrol.status === 'active') {
+      setVessels(prev =>
+        prev.map(vessel =>
+          vessel.id === newPatrol.vesselId
+            ? { ...vessel, patrolId: newPatrol.id }
+            : vessel
+        )
+      );
+    }
+    return newPatrol;
   }, []);
 
   const getVesselById = useCallback((id: string) => {
@@ -102,6 +140,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         selectedVesselId,
         setSelectedVesselId,
         addIncident,
+        addVessel,
+        addPatrol,
         getVesselById,
         getPatrolById,
         getIncidentById,

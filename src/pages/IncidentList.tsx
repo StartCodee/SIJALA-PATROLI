@@ -7,6 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -17,11 +25,13 @@ import {
 import { useData } from '@/context/DataContext';
 import { formatRelativeTime } from '@/data/mockData';
 import { useState } from 'react';
+import { IncidentForm } from '@/components/incidents/IncidentForm';
 
 const IncidentList = () => {
   const navigate = useNavigate();
   const { incidents, vessels, patrols } = useData();
   const [searchQuery, setSearchQuery] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
 
   const filteredIncidents = incidents.filter(i =>
     i.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -72,10 +82,27 @@ const IncidentList = () => {
                   className="pl-9 w-64"
                 />
               </div>
-              <Button onClick={() => navigate('/incidents/new')} className="gap-2">
-                <Plus className="h-4 w-4" />
-                Buat Laporan
-              </Button>
+              <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                <DialogTrigger asChild>
+                  <Button className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Buat Laporan
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Form Laporan Kejadian</DialogTitle>
+                    <DialogDescription>
+                      Isi informasi kejadian baru tanpa berpindah halaman.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <IncidentForm
+                    resetOnSuccess
+                    onCancel={() => setCreateOpen(false)}
+                    onSuccess={() => setCreateOpen(false)}
+                  />
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </CardHeader>

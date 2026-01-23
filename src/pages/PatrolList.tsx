@@ -5,6 +5,23 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -14,12 +31,26 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useData } from '@/context/DataContext';
+import { useToast } from '@/hooks/use-toast';
+import { AREA_NAMES, Patrol } from '@/data/mockData';
 import { useState } from 'react';
 
 const PatrolList = () => {
   const navigate = useNavigate();
-  const { patrols, vessels } = useData();
+  const { patrols, vessels, addPatrol } = useData();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const getInitialFormData = () => ({
+    code: '',
+    date: new Date().toISOString().split('T')[0],
+    areaName: '',
+    vesselId: '',
+    status: 'planned' as Patrol['status'],
+    objective: '',
+  });
+  const [formData, setFormData] = useState(getInitialFormData);
 
   const filteredPatrols = patrols.filter(p =>
     p.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -38,6 +69,73 @@ const PatrolList = () => {
       month: 'short',
       year: 'numeric',
     });
+  };
+
+  const handleCreateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.code.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Kode patroli wajib diisi',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!formData.date) {
+      toast({
+        title: 'Error',
+        description: 'Tanggal patroli wajib diisi',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!formData.areaName) {
+      toast({
+        title: 'Error',
+        description: 'Area patroli wajib dipilih',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!formData.vesselId) {
+      toast({
+        title: 'Error',
+        description: 'Kapal patroli wajib dipilih',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const startTime = formData.date
+      ? new Date(`${formData.date}T08:00:00`)
+      : new Date();
+    const endTime = formData.status === 'completed' ? new Date() : null;
+
+    addPatrol({
+      code: formData.code.trim(),
+      date: formData.date,
+      vesselId: formData.vesselId,
+      status: formData.status,
+      areaName: formData.areaName,
+      startTime,
+      endTime,
+      objective: formData.objective.trim() || 'Patroli rutin',
+    });
+
+    toast({
+      title: 'Berhasil',
+      description: 'Patroli berhasil dibuat',
+    });
+
+    setIsSubmitting(false);
+    setCreateOpen(false);
+    setFormData(getInitialFormData());
   };
 
   return (
@@ -59,10 +157,131 @@ const PatrolList = () => {
                   className="pl-9 w-64"
                 />
               </div>
-              <Button disabled className="gap-2">
-                <Plus className="h-4 w-4" />
-                Buat Patroli
-              </Button>
+              <Dialog
+                open={createOpen}
+                onOpenChange={(open) => {
+                  setCreateOpen(open);
+                  if (!open) {
+                    setFormData(getInitialFormData());
+                  }
+                }}
+              >
+                <DialogTrigger asChild>
+                  <Button className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Buat Patroli
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Form Patroli Baru</DialogTitle>
+                    <DialogDescription>
+                      Tambahkan jadwal patroli tanpa berpindah halaman.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleCreateSubmit} className="space-y-6">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="code">Kode Patroli *</Label>
+                        <Input
+                          id="code"
+                          placeholder="PTR-2026-007"
+                          value={formData.code}
+                          onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="date">Tanggal *</Label>
+                        <Input
+                          id="date"
+                          type="date"
+                          value={formData.date}
+                          onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="areaName">Area Patroli *</Label>
+                      <Select
+                        value={formData.areaName}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, areaName: value }))}
+                      >
+                        <SelectTrigger id="areaName">
+                          <SelectValue placeholder="Pilih area patroli" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {AREA_NAMES.map((area) => (
+                            <SelectItem key={area} value={area}>
+                              {area}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="vesselId">Kapal *</Label>
+                      <Select
+                        value={formData.vesselId}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, vesselId: value }))}
+                      >
+                        <SelectTrigger id="vesselId">
+                          <SelectValue placeholder="Pilih kapal patroli" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vessels.map((vessel) => (
+                            <SelectItem key={vessel.id} value={vessel.id}>
+                              {vessel.name} ({vessel.callSign})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="status">Status *</Label>
+                      <Select
+                        value={formData.status}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as Patrol['status'] }))}
+                      >
+                        <SelectTrigger id="status">
+                          <SelectValue placeholder="Pilih status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="planned">Direncanakan</SelectItem>
+                          <SelectItem value="active">Aktif</SelectItem>
+                          <SelectItem value="completed">Selesai</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="objective">Tujuan Patroli</Label>
+                      <Textarea
+                        id="objective"
+                        placeholder="Ringkasan tujuan patroli..."
+                        rows={3}
+                        value={formData.objective}
+                        onChange={(e) => setFormData(prev => ({ ...prev, objective: e.target.value }))}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-end gap-3 pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setCreateOpen(false)}
+                      >
+                        Batal
+                      </Button>
+                      <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? 'Menyimpan...' : 'Simpan Patroli'}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </CardHeader>

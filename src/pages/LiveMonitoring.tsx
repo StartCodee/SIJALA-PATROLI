@@ -79,7 +79,7 @@ const LiveMonitoring = () => {
                   {filteredVessels.length} kapal
                 </span>
               </div>
-              
+            
               {/* Filter */}
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-full">
@@ -88,11 +88,31 @@ const LiveMonitoring = () => {
                     <SelectValue placeholder="Filter status" />
                   </div>
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Status</SelectItem>
-                  <SelectItem value="aktif">Aktif</SelectItem>
-                  <SelectItem value="standby">Standby</SelectItem>
-                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                <SelectContent className="bg-sidebar text-sidebar-foreground border-sidebar-border">
+                  <SelectItem
+                    value="all"
+                    className="data-[highlighted]:bg-sidebar-primary data-[highlighted]:text-sidebar-primary-foreground data-[state=checked]:bg-sidebar-primary data-[state=checked]:text-sidebar-primary-foreground"
+                  >
+                    Semua Status
+                  </SelectItem>
+                  <SelectItem
+                    value="aktif"
+                    className="data-[highlighted]:bg-sidebar-primary data-[highlighted]:text-sidebar-primary-foreground data-[state=checked]:bg-sidebar-primary data-[state=checked]:text-sidebar-primary-foreground"
+                  >
+                    Aktif
+                  </SelectItem>
+                  <SelectItem
+                    value="standby"
+                    className="data-[highlighted]:bg-sidebar-primary data-[highlighted]:text-sidebar-primary-foreground data-[state=checked]:bg-sidebar-primary data-[state=checked]:text-sidebar-primary-foreground"
+                  >
+                    Standby
+                  </SelectItem>
+                  <SelectItem
+                    value="maintenance"
+                    className="data-[highlighted]:bg-sidebar-primary data-[highlighted]:text-sidebar-primary-foreground data-[state=checked]:bg-sidebar-primary data-[state=checked]:text-sidebar-primary-foreground"
+                  >
+                    Maintenance
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </CardHeader>
