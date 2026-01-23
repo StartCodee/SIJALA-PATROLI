@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -8,10 +7,10 @@ import {
   FileWarning,
   ChevronLeft,
   ChevronRight,
-  Anchor,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import LogoKkpRajaAmpat from '@/assets/KKP-RajaAmpat.png';
 
 const navItems = [
   {
@@ -59,8 +58,12 @@ export const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
       {/* Logo */}
       <div className="flex h-16 items-center justify-between px-4 border-b border-border">
         <div className={cn('flex items-center gap-3', collapsed && 'justify-center w-full')}>
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Anchor className="h-5 w-5" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground">
+            <img
+              src={LogoKkpRajaAmpat}
+              alt="KKP Raja Ampat"
+              className="h-7 w-7 object-contain"
+            />
           </div>
           {!collapsed && (
             <div className="flex flex-col">
@@ -100,20 +103,16 @@ export const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
       <div className="absolute bottom-4 left-0 right-0 px-3">
         <Button
           variant="ghost"
-          size="sm"
+          size="icon"
           onClick={onToggle}
-          className={cn(
-            'w-full justify-center text-muted-foreground hover:text-foreground',
-            collapsed ? 'px-2' : 'px-3'
-          )}
+          className="mx-auto bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/80"
+          aria-label={collapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'}
+          title={collapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'}
         >
           {collapsed ? (
             <ChevronRight className="h-4 w-4" />
           ) : (
-            <>
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              <span>Ciutkan</span>
-            </>
+            <ChevronLeft className="h-4 w-4" />
           )}
         </Button>
       </div>

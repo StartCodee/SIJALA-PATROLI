@@ -1,7 +1,5 @@
 // Mock Data untuk Dashboard Patroli Jaga Laut - Raja Ampat
-// Data realistis untuk demo MVP
 
-// Helper functions untuk timestamp dinamis
 const NOW = () => new Date();
 const NOW_MINUS_SEC = (seconds: number) => new Date(Date.now() - seconds * 1000);
 const NOW_MINUS_MIN = (minutes: number) => new Date(Date.now() - minutes * 60 * 1000);

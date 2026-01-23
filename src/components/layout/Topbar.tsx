@@ -45,12 +45,9 @@ export const Topbar = ({ title, subtitle, sidebarCollapsed, onMenuClick }: Topba
             <Input
               placeholder="Cari..."
               disabled
-              className="w-64 pl-9 bg-muted/50 border-transparent cursor-not-allowed"
+              className="w-64 pl-9 bg-muted/70 border border-border shadow-md rounded-full cursor-not-allowed"
             />
           </div>
-          <Badge variant="secondary" className="bg-secondary text-secondary-foreground font-medium">
-            MVP
-          </Badge>
         </div>
       </div>
     </header>
