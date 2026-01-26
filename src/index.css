@@ -1,129 +1,142 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 
- * Design System: Patroli Jaga Laut - BLUD UPTD Raja Ampat
- * Color Palette: Teal/Aqua/Mint (Ocean Conservation Theme)
- * All colors in HSL format
- */
-
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+/* Raja Ampat Conservation Fee Admin Dashboard - Clean Blue Theme */
 
 @layer base {
   :root {
-    /* Base backgrounds */
-    --background: 0 0% 100%;
-    --background-secondary: 214 32% 97%;
-    --foreground: 221 39% 11%;
+    /* Core Clean Blue Palette */
+    --background: 210 30% 98%;
+    --background-secondary: 210 35% 96%;
+    --foreground: 214 45% 15%;
 
-    /* Card surfaces */
     --card: 0 0% 100%;
-    --card-foreground: 221 39% 11%;
+    --card-foreground: 214 45% 15%;
 
-    /* Popover */
     --popover: 0 0% 100%;
-    --popover-foreground: 221 39% 11%;
+    --popover-foreground: 214 45% 15%;
 
-    /* Primary: Teal #3AA0B3 */
-    --primary: 189 51% 46%;
+    /* Primary - Blue from KKP logo text */
+    --primary: 213 64% 33%;
     --primary-foreground: 0 0% 100%;
-    --primary-light: 189 51% 96%;
+    --primary-light: 212 60% 93%;
 
-    /* Secondary: Aqua #BFE8F2 */
-    --secondary: 193 66% 85%;
-    --secondary-foreground: 189 51% 30%;
+    /* Secondary - Deep Blue */
+    --secondary: 217 55% 22%;
+    --secondary-foreground: 0 0% 100%;
 
-    /* Accent: Mint #47C28B */
-    --accent: 152 52% 52%;
-    --accent-foreground: 0 0% 100%;
+    /* Muted - Soft gray-blue */
+    --muted: 210 25% 94%;
+    --muted-foreground: 214 18% 45%;
 
-    /* Muted */
-    --muted: 214 32% 97%;
-    --muted-foreground: 218 11% 45%;
+    /* Accent - Light blue */
+    --accent: 212 60% 93%;
+    --accent-foreground: 214 55% 30%;
 
-    /* Destructive */
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Warning */
     --warning: 45 93% 47%;
-    --warning-foreground: 221 39% 11%;
+    --warning-foreground: 214 45% 15%;
 
-    /* Success */
-    --success: 152 52% 52%;
+    --success: 160 84% 39%;
     --success-foreground: 0 0% 100%;
 
-    /* Borders & Inputs */
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 189 51% 46%;
+    --border: 210 22% 88%;
+    --input: 210 22% 88%;
+    --ring: 213 64% 33%;
 
     --radius: 0.75rem;
 
-    /* Sidebar */
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 221 39% 11%;
-    --sidebar-primary: 189 51% 46%;
+    /* Sidebar - Clean blue gradient */
+    --sidebar-background: 216 55% 16%;
+    --sidebar-foreground: 210 30% 92%;
+    --sidebar-primary: 213 70% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 193 66% 95%;
-    --sidebar-accent-foreground: 189 51% 30%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 189 51% 46%;
+    --sidebar-accent: 216 45% 22%;
+    --sidebar-accent-foreground: 210 30% 96%;
+    --sidebar-border: 214 40% 22%;
+    --sidebar-ring: 213 70% 48%;
+
+    /* Custom Status Colors */
+    --status-pending: 45 93% 47%;
+    --status-pending-bg: 45 93% 94%;
+    --status-approved: 160 84% 39%;
+    --status-approved-bg: 160 60% 92%;
+    --status-rejected: 0 72% 51%;
+    --status-rejected-bg: 0 60% 94%;
+    --status-revision: 25 95% 53%;
+    --status-revision-bg: 25 80% 94%;
+    --status-info: 212 80% 45%;
+    --status-info-bg: 212 70% 94%;
+
+    /* Blue gradients */
+    --gradient-ocean: linear-gradient(135deg, hsl(213 64% 33%) 0%, hsl(215 60% 36%) 50%, hsl(220 55% 32%) 100%);
+    --gradient-ocean-light: linear-gradient(135deg, hsl(210 60% 97%) 0%, hsl(210 45% 95%) 100%);
+    --gradient-sidebar: linear-gradient(180deg, hsl(216 55% 16%) 0%, hsl(220 60% 10%) 100%);
+    --gradient-card-hover: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(210 35% 98%) 100%);
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.06);
+    --shadow-md: 0 4px 10px -6px rgb(15 23 42 / 0.18);
+    --shadow-lg: 0 12px 20px -12px rgb(15 23 42 / 0.25);
+    --shadow-card: 0 2px 10px -6px rgb(15 23 42 / 0.16);
 
     /* Map placeholder grid */
-    --map-grid: 220 13% 95%;
-    --map-placeholder: 214 32% 97%;
+    --map-grid: 210 22% 92%;
+    --map-placeholder: 210 30% 97%;
   }
 
   .dark {
-    --background: 221 39% 8%;
-    --background-secondary: 221 39% 11%;
-    --foreground: 210 40% 98%;
+    --background: 215 50% 8%;
+    --background-secondary: 214 35% 14%;
+    --foreground: 210 30% 95%;
 
-    --card: 221 39% 11%;
-    --card-foreground: 210 40% 98%;
+    --card: 215 45% 12%;
+    --card-foreground: 200 30% 95%;
 
-    --popover: 221 39% 11%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 215 45% 12%;
+    --popover-foreground: 200 30% 95%;
 
-    --primary: 189 51% 50%;
+    --primary: 213 70% 52%;
     --primary-foreground: 0 0% 100%;
-    --primary-light: 189 51% 15%;
+    --primary-light: 213 70% 18%;
 
-    --secondary: 193 40% 20%;
-    --secondary-foreground: 193 66% 85%;
+    --secondary: 217 45% 30%;
+    --secondary-foreground: 200 30% 95%;
 
-    --accent: 152 52% 45%;
-    --accent-foreground: 0 0% 100%;
+    --muted: 214 35% 18%;
+    --muted-foreground: 200 20% 60%;
 
-    --muted: 217 32% 17%;
-    --muted-foreground: 215 20% 65%;
+    --accent: 212 40% 20%;
+    --accent-foreground: 210 40% 85%;
 
-    --destructive: 0 62% 40%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
 
     --warning: 45 93% 40%;
-    --warning-foreground: 221 39% 11%;
+    --warning-foreground: 210 30% 95%;
 
-    --success: 152 52% 40%;
+    --success: 160 84% 35%;
     --success-foreground: 0 0% 100%;
 
-    --border: 217 32% 20%;
-    --input: 217 32% 20%;
-    --ring: 189 51% 50%;
+    --border: 214 35% 20%;
+    --input: 214 35% 20%;
+    --ring: 213 70% 52%;
 
-    --sidebar-background: 221 39% 8%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 189 51% 50%;
+    --sidebar-background: 216 55% 10%;
+    --sidebar-foreground: 210 30% 85%;
+    --sidebar-primary: 213 70% 52%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 32% 17%;
-    --sidebar-accent-foreground: 193 66% 85%;
-    --sidebar-border: 217 32% 20%;
-    --sidebar-ring: 189 51% 50%;
+    --sidebar-accent: 216 45% 18%;
+    --sidebar-accent-foreground: 210 30% 90%;
+    --sidebar-border: 214 35% 18%;
+    --sidebar-ring: 213 70% 52%;
 
-    --map-grid: 217 32% 17%;
-    --map-placeholder: 221 39% 11%;
+    --map-grid: 214 35% 20%;
+    --map-placeholder: 215 45% 12%;
   }
 }
 
@@ -133,28 +146,196 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    @apply font-semibold tracking-tight;
+  }
+
+  .leaflet-container {
+    height: 100%;
+    width: 100%;
+  }
+
+  .leaflet-container img {
+    max-width: none !important;
+  }
+}
+
+@layer components {
+  /* Subtle blue wave pattern */
+  .ocean-pattern {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%231E4F8A' fill-opacity='0.02' d='M0,192L48,181.3C96,171,192,149,288,154.7C384,160,480,192,576,197.3C672,203,768,181,864,181.3C960,181,1056,203,1152,197.3C1248,192,1344,160,1392,144L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E");
+    background-position: bottom;
+    background-repeat: repeat-x;
+    background-size: 100% 120px;
+  }
+
+  /* Card with ocean hover effect */
+  .card-ocean {
+    @apply bg-card rounded-xl border border-border transition-all duration-300;
+    box-shadow: var(--shadow-card);
+  }
+
+  .card-ocean:hover {
+    @apply border-primary/20;
+    background: var(--gradient-card-hover);
+    box-shadow: var(--shadow-md);
+  }
+
+  /* KPI Card styles */
+  .kpi-card {
+    @apply bg-card rounded-xl border border-border p-5 transition-all duration-300;
+    box-shadow: var(--shadow-card);
+  }
+
+  .kpi-card:hover {
+    @apply border-primary/30 -translate-y-0.5;
+    box-shadow: var(--shadow-md);
+  }
+
+  /* Status chip base */
+  .status-chip {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap;
+  }
+
+  .status-chip-pending {
+    background-color: hsl(var(--status-pending-bg));
+    color: hsl(var(--status-pending));
+  }
+
+  .status-chip-approved {
+    background-color: hsl(var(--status-approved-bg));
+    color: hsl(var(--status-approved));
+  }
+
+  .status-chip-rejected {
+    background-color: hsl(var(--status-rejected-bg));
+    color: hsl(var(--status-rejected));
+  }
+
+  .status-chip-revision {
+    background-color: hsl(var(--status-revision-bg));
+    color: hsl(var(--status-revision));
+  }
+
+  .status-chip-info {
+    background-color: hsl(var(--status-info-bg));
+    color: hsl(var(--status-info));
+  }
+
+  /* Sidebar nav item */
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-sidebar-foreground/80 transition-all duration-200;
+  }
+
+  .nav-item:hover {
+    @apply bg-sidebar-accent text-sidebar-foreground;
+  }
+
+  .nav-item.active {
+    @apply bg-sidebar-primary/15 text-sidebar-primary font-medium;
+  }
+
+  /* Table styles */
+  .data-table {
+    @apply w-full text-sm;
+  }
+
+  .data-table th {
+    @apply px-4 py-3 text-left font-medium text-muted-foreground bg-muted/50 border-b;
+  }
+
+  .data-table td {
+    @apply px-4 py-3.5 border-b border-border/50;
+  }
+
+  .data-table tbody tr {
+    @apply transition-colors hover:bg-muted/30;
+  }
+
+  /* Ocean gradient button */
+  .btn-ocean {
+    background: var(--gradient-ocean);
+    @apply text-white font-medium px-4 py-2 rounded-lg transition-all duration-200 hover:opacity-90 hover:shadow-md;
+  }
+
+  /* Scrollbar styling */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/30;
   }
 }
 
 @layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Animation utilities */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
   .bg-content {
     background-color: hsl(var(--background-secondary));
   }
 
   .shadow-card {
-    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+    box-shadow: var(--shadow-card);
   }
 
   .shadow-card-hover {
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    box-shadow: var(--shadow-md);
   }
 
   .map-grid-bg {
-    background-image: 
+    background-image:
       linear-gradient(to right, hsl(var(--map-grid)) 1px, transparent 1px),
       linear-gradient(to bottom, hsl(var(--map-grid)) 1px, transparent 1px);
     background-size: 24px 24px;
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 }
