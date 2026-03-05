@@ -8,16 +8,7 @@ const navItems = [
         href: '/',
         icon: LayoutDashboard,
     },
-    {
-        title: 'Pemantauan Langsung',
-        href: '/monitoring',
-        icon: MapPin,
-    },
-    {
-        title: 'Kapal',
-        href: '/vessels',
-        icon: Ship,
-    },
+   
     {
         title: 'Patroli',
         href: '/patrols',
