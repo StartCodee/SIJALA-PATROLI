@@ -49,16 +49,7 @@ const navItems = [
         href: '/findings',
         icon: Camera,
     },
-    // {
-    //     title: 'Monitoring Non-Permanent',
-    //     href: '/monitoring-non-permanent',
-    //     icon: ClipboardList,
-    // },
-    // {
-    //     title: 'Monitoring Permanent',
-    //     href: '/monitoring-permanent',
-    //     icon: Landmark,
-    // },
+    
     {
         title: 'Observasi Megafauna',
         href: '/monitoring-megafauna',

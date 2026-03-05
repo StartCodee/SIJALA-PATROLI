@@ -54,10 +54,10 @@ const App = () => (<QueryClientProvider client={queryClient}>
             <Route path="/incidents/:id" element={<IncidentDetail />}/>
             <Route path="/findings" element={<Findings />}/>
             <Route path="/findings/:id" element={<FindingDetail />}/>
-            <Route path="/monitoring-non-permanent" element={<NonPermanentResourceList />}/>
-            <Route path="/monitoring-non-permanent/:id" element={<NonPermanentResourceDetail />}/>
-            <Route path="/monitoring-permanent" element={<PermanentResourceList />}/>
-            <Route path="/monitoring-permanent/:id" element={<PermanentResourceDetail />}/>
+            {/* <Route path="/monitoring-non-permanent" element={<NonPermanentResourceList />}/> */}
+            {/* <Route path="/monitoring-non-permanent/:id" element={<NonPermanentResourceDetail />}/> */}
+            {/* <Route path="/monitoring-permanent" element={<PermanentResourceList />}/> */}
+            {/* <Route path="/monitoring-permanent/:id" element={<PermanentResourceDetail />}/> */}
             <Route path="/monitoring-megafauna" element={<MegafaunaObservationList />}/>
             <Route path="/monitoring-megafauna/:id" element={<MegafaunaObservationDetail />}/>
             <Route path="/monitoring-habitat" element={<HabitatMonitoringList />}/>
