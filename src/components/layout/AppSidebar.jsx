@@ -9,16 +9,16 @@ const navItems = [
         href: '/',
         icon: LayoutDashboard,
     },
-    {
-        title: 'Pemantauan Langsung',
-        href: '/monitoring',
-        icon: MapPin,
-    },
-    {
-        title: 'Kapal',
-        href: '/vessels',
-        icon: Ship,
-    },
+    // {
+    //     title: 'Pemantauan Langsung',
+    //     href: '/monitoring',
+    //     icon: MapPin,
+    // },
+    // {
+    //     title: 'Kapal',
+    //     href: '/vessels',
+    //     icon: Ship,
+    // },
     {
         title: 'Patroli',
         href: '/patrols',
@@ -29,11 +29,11 @@ const navItems = [
         href: '/crew',
         icon: Users,
     },
-    {
-        title: 'Penugasan Crew',
-        href: '/crew-assignments',
-        icon: ClipboardList,
-    },
+    // {
+    //     title: 'Penugasan Crew',
+    //     href: '/crew-assignments',
+    //     icon: ClipboardList,
+    // },
     {
         title: 'Pelabuhan/Pos Jaga',
         href: '/guard-posts',
