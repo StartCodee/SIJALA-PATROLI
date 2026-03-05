@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutDashboard, MapPin, Ship, Route, Users, ClipboardList, Anchor, FileWarning, LogOut, ChevronLeft, ChevronRight, Camera, Landmark, Fish, TreePine, } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import LogoKkpRajaAmpat from '@/assets/KKP-RajaAmpat.png';
+import TribbleImage from '@/assets/image/tribble.png';
 const navItems = [
     {
         title: 'Dashboard',
@@ -89,8 +90,10 @@ export const AppSidebar = ({ collapsed, onToggle }) => {
         </div>
       </div>
 
+      <img src={TribbleImage} alt="Tribble" className="pointer-events-none absolute bottom-[-5px] w-[150px]"/>
+
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto custom-scrollbar py-4">
+      <nav className="relative z-10 flex-1 overflow-y-auto custom-scrollbar py-4">
         {!collapsed && (<p className="text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-wider px-4 mb-2">
             Menu Utama
           </p>)}
@@ -158,3 +161,4 @@ export const AppSidebar = ({ collapsed, onToggle }) => {
       </button>
     </aside>);
 };
+
