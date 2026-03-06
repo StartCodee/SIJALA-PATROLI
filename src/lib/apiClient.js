@@ -13,6 +13,7 @@ async function request(path, options = {}) {
     return null;
   }
 
+  
   const contentType = response.headers.get('content-type') || '';
   const body = contentType.includes('application/json')
     ? await response.json()
