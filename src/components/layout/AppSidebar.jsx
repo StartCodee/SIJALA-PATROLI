@@ -78,11 +78,7 @@ const patrolGroupItems = [
     },
 ];
 const adminItems = [
-    {
-        title: 'Manajemen Pengguna',
-        href: '/users',
-        icon: Users,
-    },
+   
 ];
 const profileInfo = {
     name: 'Rudi Hartono',
