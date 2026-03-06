@@ -1,61 +1,113 @@
-import { Ship, Route, FileWarning, AlertTriangle, Activity, Clock } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { FileWarning, CheckCircle2, AlertTriangle, Clock, Route, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { KPICard } from '@/components/shared/KPICard';
 import { MapCard } from '@/components/map/MapCard';
-import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { useData } from '@/context/DataContext';
-import { getConnectionStatus, formatRelativeTime } from '@/data/mockData';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import {
+  apiClient,
+  formatDateTime,
+  reviewClassMap,
+  reviewLabelMap,
+} from '@/lib/apiClient';
+
 const Dashboard = () => {
-    const navigate = useNavigate();
-    const { vessels, patrols, incidents } = useData();
-    // Calculate KPIs
-    const activeVessels = vessels.filter(v => v.status === 'aktif').length;
-    const activePatrols = patrols.filter(p => p.status === 'active').length;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayIncidents = incidents.filter(i => i.time >= today).length;
-    const offlineVessels = vessels.filter(v => {
-        const status = getConnectionStatus(v.lastPosition.timestamp);
-        return status === 'offline';
-    }).length;
-    // Recent activities (latest 5 incidents)
-    const recentActivities = incidents.slice(0, 5);
-    return (<MainLayout title="Dashboard" subtitle="Ringkasan aktivitas patroli hari ini">
-      {/* KPI Cards */}
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const [summary, setSummary] = useState(null);
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [summaryData, reportData] = await Promise.all([
+        apiClient.getDashboardSummary(),
+        apiClient.getReports(),
+      ]);
+
+      setSummary(summaryData);
+      setReports(reportData.items || []);
+    } catch (error) {
+      toast({
+        title: 'Gagal memuat dashboard',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const recentReports = useMemo(() => reports.slice(0, 8), [reports]);
+
+  const pendingPatrols = useMemo(
+    () => reports.filter((item) => item.type === 'PATROL_JAGA_LAUT' && item.status === 'pending').slice(0, 4),
+    [reports],
+  );
+
+  return (
+    <MainLayout title="Dashboard" subtitle="Ringkasan laporan patroli & monitoring">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <KPICard title="Kapal Aktif" value={activeVessels} icon={Ship} variant="primary"/>
-        <KPICard title="Patroli Aktif" value={activePatrols} icon={Route} variant="success"/>
-        <KPICard title="Laporan Hari Ini" value={todayIncidents} icon={FileWarning} variant="warning"/>
-        <KPICard title="Tidak Terbarui >5 Menit" value={offlineVessels} icon={AlertTriangle} variant={offlineVessels > 0 ? 'destructive' : 'default'}/>
+        <KPICard
+          title="Total Laporan"
+          value={summary?.totalReports ?? 0}
+          icon={FileWarning}
+          variant="primary"
+        />
+        <KPICard
+          title="Menunggu Verifikasi"
+          value={summary?.byStatus?.pending ?? 0}
+          icon={Clock}
+          variant="warning"
+        />
+        <KPICard
+          title="Sudah Diterima"
+          value={summary?.byStatus?.validated ?? 0}
+          icon={CheckCircle2}
+          variant="success"
+        />
+        <KPICard
+          title="Dikembalikan"
+          value={summary?.byStatus?.rejected ?? 0}
+          icon={AlertTriangle}
+          variant="destructive"
+        />
       </div>
 
-      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Map Preview */}
         <div className="lg:col-span-2">
-          <MapCard title="Peta Ringkasan" showControls={false} className="h-full">
+          <MapCard title="Ringkasan Monitoring" showControls={false} className="h-full">
             <div className="absolute top-4 left-4 bg-card/95 backdrop-blur-sm border border-border rounded-lg px-3 py-2 shadow-card">
               <div className="flex items-center gap-2">
-                <Activity className="h-4 w-4 text-success animate-pulse"/>
-                <span className="text-sm font-medium">{activeVessels} kapal aktif</span>
+                <Activity className="h-4 w-4 text-success animate-pulse" />
+                <span className="text-sm font-medium">
+                  {summary?.byStatus?.pending ?? 0} laporan menunggu verifikasi
+                </span>
               </div>
             </div>
           </MapCard>
         </div>
 
-        {/* Recent Activity */}
         <Card className="shadow-card overflow-hidden">
           <CardHeader className="pb-3 border-b border-border/60">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Clock className="h-5 w-5 text-primary"/>
-                Aktivitas Terkini
+                <Clock className="h-5 w-5 text-primary" />
+                Laporan Terbaru
               </CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/incidents')} className="text-xs">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/patrols')} className="text-xs">
                 Lihat Semua
               </Button>
             </div>
@@ -64,25 +116,45 @@ const Dashboard = () => {
             <ScrollArea className="h-[340px]">
               <div className="w-full overflow-x-hidden p-3">
                 <div className="space-y-2">
-                {recentActivities.map((incident) => (<div key={incident.id} className="group w-full min-w-0 rounded-lg border border-transparent bg-card px-4 py-3 transition-all hover:border-primary/20 hover:bg-primary/5 cursor-pointer" onClick={() => navigate(`/incidents/${incident.id}`)}>
-                    <div className="flex flex-wrap items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-semibold text-foreground truncate">
-                          {incident.title}
-                        </h4>
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                            {incident.category}
-                          </span>
-                          <span className="h-1 w-1 rounded-full bg-muted-foreground/60"/>
-                          <span>{formatRelativeTime(incident.time)}</span>
+                  {recentReports.map((item) => (
+                    <div
+                      key={item.id}
+                      className="group w-full min-w-0 rounded-lg border border-transparent bg-card px-4 py-3 transition-all hover:border-primary/20 hover:bg-primary/5 cursor-pointer"
+                      onClick={() => {
+                        if (item.type === 'PATROL_JAGA_LAUT') navigate(`/patrols/${item.id}`);
+                        else if (item.type === 'RESOURCE_USE_MONITORING') navigate(`/monitoring-megafauna/${item.id}`);
+                        else navigate(`/monitoring-habitat/${item.id}`);
+                      }}
+                    >
+                      <div className="flex flex-wrap items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-sm font-semibold text-foreground truncate">{item.reportCode}</h4>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                              {item.type === 'PATROL_JAGA_LAUT'
+                                ? 'Patroli'
+                                : item.type === 'RESOURCE_USE_MONITORING'
+                                  ? 'RUM'
+                                  : 'Monitoring Lainnya'}
+                            </span>
+                            <span className="h-1 w-1 rounded-full bg-muted-foreground/60" />
+                            <span>{formatDateTime(item.submittedAt)}</span>
+                          </div>
+                        </div>
+                        <div className="ml-auto shrink-0">
+                          <Badge className={`border ${reviewClassMap[item.status]}`}>
+                            {reviewLabelMap[item.status]}
+                          </Badge>
                         </div>
                       </div>
-                      <div className="ml-auto shrink-0">
-                        <StatusBadge status={incident.status} size="sm"/>
-                      </div>
                     </div>
-                  </div>))}
+                  ))}
+
+                  {recentReports.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-6">
+                      {loading ? 'Memuat data...' : 'Belum ada laporan.'}
+                    </p>
+                  )}
                 </div>
               </div>
             </ScrollArea>
@@ -90,13 +162,12 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      {/* Active Patrols */}
       <Card className="mt-6 shadow-card">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Route className="h-5 w-5 text-primary"/>
-              Patroli Aktif
+              <Route className="h-5 w-5 text-primary" />
+              Patroli Menunggu Verifikasi
             </CardTitle>
             <Button variant="ghost" size="sm" onClick={() => navigate('/patrols')} className="text-xs">
               Lihat Semua
@@ -105,27 +176,36 @@ const Dashboard = () => {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {patrols
-            .filter(p => p.status === 'active')
-            .map((patrol) => {
-            const vessel = vessels.find(v => v.id === patrol.vesselId);
-            return (<div key={patrol.id} className="p-4 rounded-xl border border-border bg-card hover:border-primary/30 transition-colors cursor-pointer" onClick={() => navigate(`/patrols/${patrol.id}`)}>
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Route className="h-5 w-5 text-primary"/>
-                      </div>
-                      <StatusBadge status={patrol.status} size="sm"/>
-                    </div>
-                    <h4 className="font-semibold text-foreground">{patrol.code}</h4>
-                    <p className="text-sm text-muted-foreground mt-1">{patrol.areaName}</p>
-                    {vessel && (<p className="text-xs text-muted-foreground mt-2">
-                        {vessel.name}
-                      </p>)}
-                  </div>);
-        })}
+            {pendingPatrols.map((item) => (
+              <div
+                key={item.id}
+                className="p-4 rounded-xl border border-border bg-card hover:border-primary/30 transition-colors cursor-pointer"
+                onClick={() => navigate(`/patrols/${item.id}`)}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Route className="h-5 w-5 text-primary" />
+                  </div>
+                  <Badge className={`border ${reviewClassMap[item.status]}`}>
+                    {reviewLabelMap[item.status]}
+                  </Badge>
+                </div>
+                <h4 className="font-semibold text-foreground">{item.reportCode}</h4>
+                <p className="text-sm text-muted-foreground mt-1">{item.areaName}</p>
+                <p className="text-xs text-muted-foreground mt-2">{item.submittedBy}</p>
+              </div>
+            ))}
           </div>
+
+          {pendingPatrols.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              {loading ? 'Memuat data...' : 'Tidak ada patroli pending.'}
+            </p>
+          )}
         </CardContent>
       </Card>
-    </MainLayout>);
+    </MainLayout>
+  );
 };
+
 export default Dashboard;

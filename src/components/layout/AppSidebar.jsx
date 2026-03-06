@@ -1,33 +1,70 @@
+import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, MapPin, Ship, Route, Users, ClipboardList, Anchor, FileWarning, LogOut, ChevronLeft, ChevronRight, Camera, Landmark, Fish, TreePine, } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Route,
+  Users,
+  Anchor,
+  FileWarning,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+  Camera,
+  Fish,
+  TreePine,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import LogoKkpRajaAmpat from '@/assets/KKP-RajaAmpat.png';
-const navItems = [
+import TribbleImage from '@/assets/image/tribble.png';
+const mainNavItems = [
     {
         title: 'Dashboard',
         href: '/',
         icon: LayoutDashboard,
     },
-   
-    {
-        title: 'Patroli',
-        href: '/patrols',
-        icon: Route,
-    },
+    // {
+    //     title: 'Pemantauan Langsung',
+    //     href: '/monitoring',
+    //     icon: MapPin,
+    // },
+    // {
+    //     title: 'Kapal',
+    //     href: '/vessels',
+    //     icon: Ship,
+    // },
     {
         title: 'Personel',
         href: '/crew',
         icon: Users,
     },
-    {
-        title: 'Penugasan Crew',
-        href: '/crew-assignments',
-        icon: ClipboardList,
-    },
+    // {
+    //     title: 'Penugasan Crew',
+    //     href: '/crew-assignments',
+    //     icon: ClipboardList,
+    // },
     {
         title: 'Pelabuhan/Pos Jaga',
         href: '/guard-posts',
         icon: Anchor,
+    },
+    {
+        title: 'Observasi Megafauna',
+        href: '/monitoring-megafauna',
+        icon: Fish,
+    },
+    {
+        title: 'Monitoring Habitat',
+        href: '/monitoring-habitat',
+        icon: TreePine,
+    },
+];
+const patrolGroupItems = [
+    {
+        title: 'Daftar Patroli',
+        href: '/patrols',
+        icon: Route,
     },
     {
         title: 'Laporan Kejadian',
@@ -38,17 +75,6 @@ const navItems = [
         title: 'Temuan',
         href: '/findings',
         icon: Camera,
-    },
-    
-    {
-        title: 'Observasi Megafauna',
-        href: '/monitoring-megafauna',
-        icon: Fish,
-    },
-    {
-        title: 'Monitoring Habitat',
-        href: '/monitoring-habitat',
-        icon: TreePine,
     },
 ];
 const adminItems = [
@@ -66,6 +92,14 @@ const profileInfo = {
 };
 export const AppSidebar = ({ collapsed, onToggle }) => {
     const location = useLocation();
+    const isPathActive = (href) => location.pathname === href ||
+        (href !== '/' && location.pathname.startsWith(`${href}/`));
+    const patrolGroupActive = patrolGroupItems.some((item) => isPathActive(item.href));
+    const [patrolGroupOpen, setPatrolGroupOpen] = useState(patrolGroupActive);
+    useEffect(() => {
+        if (patrolGroupActive)
+            setPatrolGroupOpen(true);
+    }, [patrolGroupActive]);
     return (<aside className={cn('fixed inset-y-0 left-0 z-40 flex h-screen flex-col bg-sidebar border-r border-sidebar-border transition-[width] duration-300 shadow-2xl', collapsed ? 'w-16' : 'w-64')} style={{ background: 'var(--gradient-sidebar)' }}>
       {/* Logo */}
       <div className="flex items-center gap-3 p-4 border-b border-sidebar-border">
@@ -80,20 +114,44 @@ export const AppSidebar = ({ collapsed, onToggle }) => {
         </div>
       </div>
 
+      <img src={TribbleImage} alt="Tribble" className="pointer-events-none absolute bottom-[-5px] w-[150px]"/>
+
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto custom-scrollbar py-4">
+      <nav className="relative z-10 flex-1 overflow-y-auto custom-scrollbar py-4">
         {!collapsed && (<p className="text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-wider px-4 mb-2">
             Menu Utama
           </p>)}
         <div className="space-y-1">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.href ||
-                (item.href !== '/' && location.pathname.startsWith(`${item.href}/`));
+          {mainNavItems.map((item) => {
+            const isActive = isPathActive(item.href);
             return (<NavLink key={item.href} to={item.href} className={cn('nav-item', isActive && 'active', collapsed && 'justify-center px-2')} title={collapsed ? item.title : undefined}>
                 <item.icon className="w-5 h-5 shrink-0"/>
                 {!collapsed && <span className="truncate">{item.title}</span>}
               </NavLink>);
         })}
+
+          {collapsed ? (<NavLink to="/patrols" className={cn('nav-item justify-center px-2', patrolGroupActive && 'active')} title="Patroli">
+              <Route className="w-5 h-5 shrink-0"/>
+            </NavLink>) : (<div className="space-y-1">
+              <button type="button" className={cn('nav-item w-full justify-between', patrolGroupActive && 'active')} onClick={() => setPatrolGroupOpen((prev) => !prev)} aria-expanded={patrolGroupOpen} aria-label="Toggle menu patroli">
+                <span className="flex items-center gap-3 min-w-0">
+                  <Route className="w-5 h-5 shrink-0"/>
+                  <span className="truncate">Patroli</span>
+                </span>
+                {patrolGroupOpen ? (<ChevronUp className="w-4 h-4 shrink-0"/>) : (<ChevronDown className="w-4 h-4 shrink-0"/>)}
+              </button>
+              <div className={cn('overflow-hidden transition-all duration-200', patrolGroupOpen ? 'max-h-52' : 'max-h-0')}>
+                <div className="space-y-1 pt-1">
+                  {patrolGroupItems.map((item) => {
+                    const isActive = isPathActive(item.href);
+                    return (<NavLink key={item.href} to={item.href} className={cn('nav-item py-2 pl-11 pr-3 text-sm', isActive && 'active')} title={item.title}>
+                        <item.icon className="w-4 h-4 shrink-0"/>
+                        <span className="truncate">{item.title}</span>
+                      </NavLink>);
+                })}
+                </div>
+              </div>
+            </div>)}
         </div>
 
         {adminItems.length > 0 && (<>
@@ -102,8 +160,7 @@ export const AppSidebar = ({ collapsed, onToggle }) => {
               </p>)}
             <div className="space-y-1">
               {adminItems.map((item) => {
-                const isActive = location.pathname === item.href ||
-                    (item.href !== '/' && location.pathname.startsWith(`${item.href}/`));
+                const isActive = isPathActive(item.href);
                 return (<NavLink key={item.href} to={item.href} className={cn('nav-item', isActive && 'active', collapsed && 'justify-center px-2')} title={collapsed ? item.title : undefined}>
                     <item.icon className="w-5 h-5 shrink-0"/>
                     {!collapsed && <span className="truncate">{item.title}</span>}

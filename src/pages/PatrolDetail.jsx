@@ -1,522 +1,521 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { Route, ArrowLeft, Ship, MapPin, Calendar, Target, Clock, FileWarning, Camera, Users, Package, Sprout, Fish, } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Clock, FileWarning, MapPin, Route, Ship, User } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { MapCard } from '@/components/map/MapCard';
-import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, } from '@/components/ui/table';
-import { useData } from '@/context/DataContext';
-import { formatRelativeTime } from '@/data/mockData';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { useToast } from '@/hooks/use-toast';
+import {
+  apiClient,
+  formatDateTime,
+  reviewClassMap,
+  reviewLabelMap,
+} from '@/lib/apiClient';
+import { AttachmentList } from '@/components/reports/AttachmentList';
+import { SignaturePreview } from '@/components/reports/SignaturePreview';
+
 const PatrolDetail = () => {
-    const { id } = useParams();
-    const navigate = useNavigate();
-    const { getPatrolById, getVesselById, getIncidentsByPatrolId, getAssignmentsByPatrolId, guardPosts, conservationAreas, crew, patrolEquipment, gearTypes, nonPermanentResources, permanentResources, megafaunaObservations, trackPoints, findings, } = useData();
-    const patrol = id ? getPatrolById(id) : undefined;
-    const vessel = patrol ? getVesselById(patrol.vesselId) : undefined;
-    const incidents = id ? getIncidentsByPatrolId(id) : [];
-    const assignments = id ? getAssignmentsByPatrolId(id) : [];
-    const patrolFindings = patrol ? findings.filter((finding) => finding.patrolId === patrol.id) : [];
-    const patrolEquipmentItems = patrol
-        ? patrolEquipment.filter((item) => item.patrolId === patrol.id)
-        : [];
-    const patrolNonPermanent = patrol
-        ? nonPermanentResources.filter((item) => item.patrolId === patrol.id)
-        : [];
-    const patrolPermanent = patrol
-        ? permanentResources.filter((item) => item.patrolId === patrol.id)
-        : [];
-    const patrolMegafauna = patrol
-        ? megafaunaObservations.filter((item) => item.patrolId === patrol.id)
-        : [];
-    if (!patrol) {
-        return (<MainLayout title="Patroli Tidak Ditemukan">
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+
+  const loadReport = async () => {
+    if (!id) return;
+
+    setLoading(true);
+    try {
+      const data = await apiClient.getReportById(id);
+      setReport(data);
+    } catch (error) {
+      toast({
+        title: 'Gagal memuat detail laporan',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const payload = report?.payload || {};
+  const summary = report?.summary || {};
+
+  const patrolInfo = payload.patrolInfo || {};
+  const attendance = Array.isArray(payload.attendance) ? payload.attendance : [];
+  const fuelAndRoute = payload.fuelAndRoute || {};
+  const findings = Array.isArray(payload.findings) ? payload.findings : [];
+  const closing = payload.closing || {};
+
+  const routePoints = useMemo(() => {
+    const points = Array.isArray(fuelAndRoute?.routePoints) ? fuelAndRoute.routePoints : [];
+    return points
+      .filter((point) => Number.isFinite(point?.lat) && Number.isFinite(point?.lon))
+      .map((point) => ({ lat: Number(point.lat), lon: Number(point.lon) }));
+  }, [fuelAndRoute]);
+
+  const findingMarkers = findings
+    .filter((finding) => Number.isFinite(finding?.mapPoint?.lat) && Number.isFinite(finding?.mapPoint?.lon))
+    .map((finding) => ({
+      lat: Number(finding.mapPoint.lat),
+      lon: Number(finding.mapPoint.lon),
+      kind: 'finding',
+      label: finding.locationName || 'Temuan',
+      description: finding.hasViolation
+        ? `Pelanggaran: ${(finding.violationTypes || []).join(', ') || '-'}`
+        : 'Tidak ada pelanggaran',
+      color: finding.hasViolation ? '#ef4444' : '#22c55e',
+    }));
+
+  const routeMarkers = useMemo(() => {
+    if (routePoints.length === 0) return [];
+    const items = [
+      {
+        lat: routePoints[0].lat,
+        lon: routePoints[0].lon,
+        kind: 'start',
+        label: 'Mulai Patroli',
+        description: 'Titik keberangkatan patroli',
+      },
+    ];
+    if (routePoints.length > 1) {
+      const last = routePoints[routePoints.length - 1];
+      items.push({
+        lat: last.lat,
+        lon: last.lon,
+        kind: 'end',
+        label: 'Selesai Patroli',
+        description: 'Titik akhir rute patroli',
+      });
+    }
+    return items;
+  }, [routePoints]);
+
+  const markers = [...routeMarkers, ...findingMarkers];
+
+  const selectedPoint = routePoints[0] || findingMarkers[0] || null;
+
+  const submitReview = async (status) => {
+    if (!report) return;
+
+    const isReject = status === 'rejected';
+    const note = isReject
+      ? window.prompt('Alasan pengembalian laporan:', report.reviewNote || '') || ''
+      : 'Data patroli sesuai.';
+
+    if (isReject && !note.trim()) {
+      toast({
+        title: 'Catatan wajib diisi',
+        description: 'Mohon isi alasan saat mengembalikan laporan.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setReviewing(true);
+    try {
+      const updated = await apiClient.reviewReport(report.id, {
+        status,
+        reviewerName: 'Verifier Dashboard',
+        reviewNote: note,
+      });
+
+      setReport(updated);
+      toast({
+        title: status === 'validated' ? 'Laporan diterima' : 'Laporan dikembalikan',
+        description: updated.reportCode,
+      });
+    } catch (error) {
+      toast({
+        title: 'Gagal menyimpan review',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setReviewing(false);
+    }
+  };
+
+  if (loading && !report) {
+    return (
+      <MainLayout title="Detail Patroli">
+        <Card className="shadow-card">
+          <CardContent className="py-12 text-center text-muted-foreground">Memuat detail laporan...</CardContent>
+        </Card>
+      </MainLayout>
+    );
+  }
+
+  if (!report) {
+    return (
+      <MainLayout title="Patroli Tidak Ditemukan">
         <Card className="shadow-card">
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">Patroli dengan ID tersebut tidak ditemukan.</p>
+            <p className="text-muted-foreground">Data laporan patroli tidak ditemukan.</p>
             <Button className="mt-4" onClick={() => navigate('/patrols')}>
               Kembali ke Daftar
             </Button>
           </CardContent>
         </Card>
-      </MainLayout>);
-    }
-    const formatDateTime = (date) => {
-        return date.toLocaleString('id-ID', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    };
-    const roleLabels = {
-        kapten: 'Kapten',
-        navigator: 'Navigator',
-        teknisi: 'Teknisi',
-        operator: 'Operator',
-        medis: 'Medis',
-        petugas: 'Petugas',
-    };
-    const validationLabels = {
-        pending: 'Menunggu',
-        validated: 'Tervalidasi',
-        rejected: 'Ditolak',
-    };
-    const getConservationAreaName = (areaId) => {
-        const area = conservationAreas.find((item) => item.id === areaId);
-        return area ? `${area.code} - ${area.name}` : '-';
-    };
-    const getPostName = (postId) => {
-        const post = guardPosts.find((item) => item.id === postId);
-        return post?.name ?? '-';
-    };
-    const getCrewName = (crewId) => {
-        const member = crew.find((item) => item.id === crewId);
-        return member?.name ?? '-';
-    };
-    const getGearTypeName = (gearTypeId) => {
-        const gear = gearTypes.find((item) => item.id === gearTypeId);
-        return gear?.name ?? 'Lainnya';
-    };
-    const patrolTrackPoints = patrol
-        ? trackPoints
-            .filter((point) => {
-            if (point.vesselId !== patrol.vesselId)
-                return false;
-            if (point.timestamp < patrol.startTime)
-                return false;
-            if (patrol.endTime && point.timestamp > patrol.endTime)
-                return false;
-            return true;
-        })
-            .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
-        : [];
-    const patrolPath = patrolTrackPoints.map((point) => ({ lat: point.lat, lon: point.lon }));
-    const mapMarkers = [
-        ...patrolFindings.map((finding) => ({
-            lat: finding.latitude,
-            lon: finding.longitude,
-            label: 'Temuan',
-            description: finding.locationName || 'Temuan patroli',
-            color: '#ef4444',
-        })),
-        ...patrolNonPermanent.map((resource) => ({
-            lat: resource.location.lat,
-            lon: resource.location.lon,
-            label: 'Non-Permanen',
-            description: resource.activity,
-            color: '#f59e0b',
-        })),
-        ...patrolPermanent.map((resource) => ({
-            lat: resource.location.lat,
-            lon: resource.location.lon,
-            label: 'Permanen',
-            description: resource.resourceType,
-            color: '#10b981',
-        })),
-        ...patrolMegafauna.map((observation) => ({
-            lat: observation.location.lat,
-            lon: observation.location.lon,
-            label: 'Megafauna',
-            description: observation.speciesName,
-            color: '#3b82f6',
-        })),
-    ];
-    return (<MainLayout title={patrol.code} subtitle={patrol.areaName}>
-      {/* Back button */}
+      </MainLayout>
+    );
+  }
+
+  return (
+    <MainLayout title={report.reportCode} subtitle={report.areaName || 'Laporan Patroli'}>
       <Button variant="ghost" size="sm" className="mb-4 -ml-2" onClick={() => navigate('/patrols')}>
-        <ArrowLeft className="h-4 w-4 mr-2"/>
+        <ArrowLeft className="h-4 w-4 mr-2" />
         Kembali ke Daftar
       </Button>
 
-      {/* Status */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-          <Route className="h-6 w-6 text-primary"/>
-        </div>
-        <div>
-          <h2 className="text-xl font-bold">{patrol.code}</h2>
-          <StatusBadge status={patrol.status}/>
-        </div>
+      <div className="flex flex-wrap items-center gap-2 mb-5">
+        <Badge className={`border ${reviewClassMap[report.status]}`}>{reviewLabelMap[report.status]}</Badge>
+        <Badge variant="outline">Dikirim: {formatDateTime(report.submittedAt)}</Badge>
+        <Badge variant="outline">Pengirim: {report.submittedBy || '-'}</Badge>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column */}
         <div className="lg:col-span-2 space-y-6">
-          <MapCard title="Rute Patroli" selectedVessel={vessel ? {
-            name: vessel.name,
-            lat: vessel.lastPosition.lat,
-            lon: vessel.lastPosition.lon,
-        } : null} paths={patrolPath.length > 1 ? [{ points: patrolPath, color: '#2563eb' }] : []} markers={mapMarkers} className="min-h-[360px]">
-            {mapMarkers.length > 0 && (<div className="absolute top-4 left-4 z-[1000] space-y-2 rounded-lg border border-border bg-card/95 px-3 py-2 text-xs text-muted-foreground shadow-card pointer-events-none">
-                <p className="font-medium text-foreground">Legenda</p>
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-[#ef4444]"/>
-                  Temuan
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-[#f59e0b]"/>
-                  Non-Permanen
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-[#10b981]"/>
-                  Permanen
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-[#3b82f6]"/>
-                  Megafauna
-                </div>
-              </div>)}
-          </MapCard>
+          <MapCard
+            title="Rute dan Titik Temuan"
+            selectedVessel={
+              selectedPoint
+                ? {
+                    name: 'Posisi Laporan',
+                    lat: selectedPoint.lat,
+                    lon: selectedPoint.lon,
+                  }
+                : null
+            }
+            paths={routePoints.length > 1 ? [{ points: routePoints, color: '#2563eb', weight: 4 }] : []}
+            markers={markers}
+            showSelectedMarker={false}
+          />
 
-          {/* Crew */}
           <Card className="shadow-card">
             <CardHeader>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary"/>
-                Crew Patroli ({assignments.length})
+                <Route className="h-5 w-5 text-primary" />
+                Informasi Patroli
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              {assignments.length === 0 ? (<p className="text-sm text-muted-foreground text-center py-6">
-                  Belum ada crew yang ditugaskan pada patroli ini.
-                </p>) : (<Table>
-                  <TableHeader>
-                    <TableRow>
-                  <TableHead>Peran</TableHead>
-                  <TableHead>Nama</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {assignments.map((assignment) => (<TableRow key={assignment.id}>
-                    <TableCell className="text-sm">{roleLabels[assignment.role]}</TableCell>
-                    <TableCell className="text-sm font-medium">{getCrewName(assignment.crewId)}</TableCell>
-                  </TableRow>))}
-              </TableBody>
-            </Table>)}
+            <CardContent className="space-y-2 text-sm">
+              <p>Area: {payload?.area?.name || report.areaName || '-'}</p>
+              <p>Kode Area: {payload?.area?.code || '-'}</p>
+              <p>Pos: {payload?.post?.name || report.postName || '-'}</p>
+              <p>Speedboat: {patrolInfo.speedboatName || '-'}</p>
+              <p>Patroli Ke: {patrolInfo.patrolSequence ?? '-'}</p>
+              <p>
+                Berangkat: {patrolInfo.departureDate || '-'} {patrolInfo.departureTime || ''}
+              </p>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Peralatan</p>
+                <div className="flex flex-wrap gap-2">
+                  {Array.isArray(patrolInfo.equipment) && patrolInfo.equipment.length > 0 ? (
+                    patrolInfo.equipment.map((item, index) => (
+                      <Badge key={`equipment-${index}`} variant="secondary">
+                        {item}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-sm text-muted-foreground">-</span>
+                  )}
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          {/* Equipment */}
           <Card className="shadow-card">
             <CardHeader>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Package className="h-5 w-5 text-primary"/>
-                Perlengkapan ({patrolEquipmentItems.length})
+                <User className="h-5 w-5 text-primary" />
+                Daftar Hadir dan Tanda Tangan ({attendance.length})
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {patrolEquipmentItems.length === 0 ? (<p className="text-sm text-muted-foreground text-center py-6">
-                  Belum ada perlengkapan tercatat.
-                </p>) : (<Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Jenis Alat</TableHead>
-                      <TableHead>Deskripsi Lainnya</TableHead>
-                      <TableHead>Jumlah</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {patrolEquipmentItems.map((item) => (<TableRow key={item.id}>
-                        <TableCell className="text-sm">{getGearTypeName(item.gearTypeId)}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{item.otherDescription ?? '-'}</TableCell>
-                        <TableCell className="text-sm">{item.quantity}</TableCell>
-                      </TableRow>))}
-                  </TableBody>
-                </Table>)}
+              {attendance.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Tidak ada data daftar hadir.</p>
+              ) : (
+                <div className="space-y-4">
+                  {attendance.map((entry, index) => (
+                    <div key={`attendance-${index}`} className="rounded-lg border border-border p-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                        <p>Nama: {entry.memberName || '-'}</p>
+                        <p>Peran: {entry.role || '-'}</p>
+                        <p>Instansi: {entry.agency || '-'}</p>
+                        <p>ID Personel: {entry.memberId || '-'}</p>
+                      </div>
+                      <div className="mt-3">
+                        <p className="text-xs text-muted-foreground mb-2">Tanda tangan</p>
+                        <SignaturePreview signature={entry.signature} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Ship className="h-5 w-5 text-primary" />
+                BBM dan Rute
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <p>BBM Awal: {fuelAndRoute.fuelStartLiters ?? 0} Liter</p>
+              <p>Catatan BBM: {fuelAndRoute.fuelNote || '-'}</p>
+              <p>Lokasi Menginap: {fuelAndRoute.overnightLocation || '-'}</p>
+              <p>Rencana Rute: {fuelAndRoute.routePlan || '-'}</p>
+              <p>Jumlah Titik Rute: {routePoints.length}</p>
+
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Daftar Titik Rute</p>
+                {routePoints.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Tidak ada titik rute.</p>
+                ) : (
+                  <div className="rounded-md border border-border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>#</TableHead>
+                          <TableHead>Latitude</TableHead>
+                          <TableHead>Longitude</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {routePoints.map((point, index) => (
+                          <TableRow key={`route-point-${index}`}>
+                            <TableCell>{index + 1}</TableCell>
+                            <TableCell>{point.lat.toFixed(6)}</TableCell>
+                            <TableCell>{point.lon.toFixed(6)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <FileWarning className="h-5 w-5 text-primary" />
+                Temuan Lapangan ({findings.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {findings.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Tidak ada temuan pada laporan ini.</p>
+              ) : (
+                <div className="space-y-4">
+                  {findings.map((finding, index) => (
+                    <div key={`finding-${index}`} className="rounded-xl border border-border p-4 space-y-3 bg-muted/20">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="secondary">Temuan #{index + 1}</Badge>
+                        <Badge
+                          className={
+                            finding.hasViolation
+                              ? 'border border-status-rejected/40 bg-status-rejected-bg text-status-rejected'
+                              : 'border border-status-approved/40 bg-status-approved-bg text-status-approved'
+                          }
+                        >
+                          {finding.hasViolation ? 'Ada Pelanggaran' : 'Tidak Ada Pelanggaran'}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          Lokasi: {finding.locationName || '-'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <FindingInfoItem label="GPS" value={finding.gpsNumber} />
+                        <FindingInfoItem label="Koordinat Zona" value={finding.zoneCoordinate} />
+                        <FindingInfoItem label="Zona Lokasi" value={finding.locationZone} />
+                        <FindingInfoItem
+                          label="Koordinat Temuan"
+                          value={
+                            Number.isFinite(finding?.mapPoint?.lat) && Number.isFinite(finding?.mapPoint?.lon)
+                              ? `${Number(finding.mapPoint.lat).toFixed(6)}, ${Number(finding.mapPoint.lon).toFixed(6)}`
+                              : '-'
+                          }
+                        />
+                        <FindingInfoItem label="Nama Kapal" value={finding.vesselName} />
+                        <FindingInfoItem label="Nahkoda" value={finding.captainName} />
+                        <FindingInfoItem label="Daya Mesin" value={finding.enginePower} />
+                        <FindingInfoItem label="Jumlah Mesin" value={finding.engineCount ?? 0} />
+                        <FindingInfoItem label="Jumlah ABK" value={finding.crewCount ?? 0} />
+                        <FindingInfoItem label="Jumlah Penumpang" value={finding.passengerCount ?? 0} />
+                        <FindingInfoItem label="Jenis Kapal" value={finding.shipKind} />
+                        <FindingInfoItem label="Kategori Kapal" value={finding.shipCategory} />
+                        <FindingInfoItem label="Tipe Mesin" value={finding.engineType} />
+                        <FindingInfoItem label="Asal Kapal" value={finding.shipOrigin} />
+                        <FindingInfoItem
+                          label="Pelanggaran"
+                          value={
+                            finding.hasViolation
+                              ? (finding.violationTypes || []).join(', ') || 'Ada (tanpa detail)'
+                              : 'Tidak ada'
+                          }
+                          fullWidth
+                        />
+                        <FindingInfoItem
+                          label="Detail Pelanggaran"
+                          value={finding.violationDetail}
+                          fullWidth
+                        />
+                        <FindingInfoItem
+                          label="Alat Tangkap"
+                          value={(finding.fishingTools || []).join(', ') || '-'}
+                          fullWidth
+                        />
+                        <FindingInfoItem label="Tindakan" value={finding.actionTaken} fullWidth />
+                      </div>
+
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">Lampiran Foto Temuan</p>
+                        <AttachmentList items={finding.photoUrls || []} emptyLabel="Tidak ada foto temuan." />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Clock className="h-5 w-5 text-primary" />
+                Penutup Patroli
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <p>BBM Tersisa: {closing.fuelRemainingLiters ?? 0} Liter</p>
+              <p>Jarak Tempuh: {closing.distanceKm ?? 0} Km</p>
+              <p>Wilayah Dipantau: {closing.monitoredArea || '-'}</p>
+              <p>
+                Waktu Kembali: {closing.returnDate || '-'} {closing.returnTime || ''}
+              </p>
+
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Tanda tangan penanggung jawab</p>
+                <SignaturePreview signature={closing.finalSignature} />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">Payload Form Lengkap (Raw)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <pre className="max-h-[380px] overflow-auto rounded-md bg-muted p-3 text-xs">
+                {JSON.stringify(payload, null, 2)}
+              </pre>
             </CardContent>
           </Card>
         </div>
 
-        {/* Info Panel */}
         <div className="space-y-6">
-          {/* Patrol Info */}
-            <Card className="shadow-card">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <Target className="h-5 w-5 text-primary"/>
-                  Detail Patroli
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <Target className="h-4 w-4 text-muted-foreground mt-0.5"/>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Area Konservasi</p>
-                    <p className="font-medium">{getConservationAreaName(patrol.conservationAreaId)}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <MapPin className="h-4 w-4 text-muted-foreground mt-0.5"/>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Area</p>
-                    <p className="font-medium">{patrol.areaName}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <MapPin className="h-4 w-4 text-muted-foreground mt-0.5"/>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Pos Jaga</p>
-                    <p className="font-medium">{getPostName(patrol.postId)}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Calendar className="h-4 w-4 text-muted-foreground mt-0.5"/>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Tanggal</p>
-                    <p className="font-medium">{patrol.date}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Clock className="h-4 w-4 text-muted-foreground mt-0.5"/>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Waktu Mulai</p>
-                    <p className="font-medium">{formatDateTime(patrol.startTime)}</p>
-                    <p className="text-xs text-muted-foreground">Jam Berangkat: {patrol.departureTime}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Clock className="h-4 w-4 text-muted-foreground mt-0.5"/>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Durasi</p>
-                    <p className="font-medium">{patrol.patrolDays} hari</p>
-                  </div>
-                </div>
-                {patrol.endTime && (<div className="flex items-start gap-3">
-                    <Clock className="h-4 w-4 text-muted-foreground mt-0.5"/>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Waktu Selesai</p>
-                      <p className="font-medium">{formatDateTime(patrol.endTime)}</p>
-                    </div>
-                  </div>)}
-                <div className="flex items-start gap-3">
-                  <MapPin className="h-4 w-4 text-muted-foreground mt-0.5"/>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Lokasi Inap</p>
-                    <p className="font-medium">{patrol.overnightLocation}</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4 pt-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground">BBM Awal</p>
-                    <p className="font-medium">{patrol.fuelStartLiters.toLocaleString('id-ID')} L</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">BBM Terpakai</p>
-                    <p className="font-medium">{patrol.fuelUsedLiters.toLocaleString('id-ID')} L</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">BBM Sisa</p>
-                    <p className="font-medium">{patrol.fuelRemainingLiters.toLocaleString('id-ID')} L</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Validasi</p>
-                    <p className="font-medium">{validationLabels[patrol.patrolValidation]}</p>
-                  </div>
-                </div>
-                <div className="pt-3 border-t border-border">
-                  <p className="text-xs text-muted-foreground mb-1">Tujuan</p>
-                  <p className="text-sm">{patrol.objective}</p>
-                </div>
-                <div className="pt-3 border-t border-border">
-                  <p className="text-xs text-muted-foreground mb-1">Deskripsi Area</p>
-                  <p className="text-sm">{patrol.areaDescription}</p>
-                </div>
-                <div className="pt-3 border-t border-border">
-                  <p className="text-xs text-muted-foreground mb-1">Pengumpulan Data</p>
-                  <p className="text-sm">{patrol.collectedBy}</p>
-                  <p className="text-xs text-muted-foreground">{formatDateTime(patrol.collectedAt)}</p>
-                </div>
-              </CardContent>
-            </Card>
+          <Card className="shadow-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-primary" />
+                Ringkasan Verifikasi
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Status</span>
+                <span>{reviewLabelMap[report.status]}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Verifier</span>
+                <span>{report.reviewerName || '-'}</span>
+              </div>
+              <div>
+                <p className="text-muted-foreground mb-1">Catatan Verifikator</p>
+                <p>{report.reviewNote || '-'}</p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  className="flex-1"
+                  disabled={reviewing || report.status === 'validated'}
+                  onClick={() => submitReview('validated')}
+                >
+                  Terima
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  disabled={reviewing || report.status === 'rejected'}
+                  onClick={() => submitReview('rejected')}
+                >
+                  Kembalikan
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Vessel Info */}
-          {vessel && (<Card className="shadow-card">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <Ship className="h-5 w-5 text-primary"/>
-                  Kapal
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 cursor-pointer hover:bg-primary/10 transition-colors" onClick={() => navigate(`/vessels/${vessel.id}`)}>
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{vessel.name}</span>
-                    <StatusBadge status={vessel.status} size="sm"/>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {vessel.callSign} • {vessel.captain}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>)}
+          <Card className="shadow-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">Ringkasan Otomatis</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>
+                Total Temuan: <span className="text-foreground">{summary.findingCount ?? findings.length}</span>
+              </p>
+              <p>
+                Temuan Pelanggaran: <span className="text-foreground">{summary.violationCount ?? 0}</span>
+              </p>
+              <p>
+                Titik Rute: <span className="text-foreground">{summary.routePointCount ?? routePoints.length}</span>
+              </p>
+              <p>
+                BBM Awal: <span className="text-foreground">{summary.fuelStartLiters ?? fuelAndRoute.fuelStartLiters ?? 0} L</span>
+              </p>
+              <p>
+                BBM Sisa: <span className="text-foreground">{summary.fuelRemainingLiters ?? closing.fuelRemainingLiters ?? 0} L</span>
+              </p>
+              <p>
+                Jarak Tempuh: <span className="text-foreground">{summary.distanceKm ?? closing.distanceKm ?? 0} Km</span>
+              </p>
+            </CardContent>
+          </Card>
         </div>
       </div>
-
-      {/* Resource Survey */}
-      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Sprout className="h-5 w-5 text-primary"/>
-              Non-Permanent Resources ({patrolNonPermanent.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {patrolNonPermanent.length === 0 ? (<p className="text-sm text-muted-foreground text-center py-6">
-                Tidak ada survey non-permanen pada patroli ini.
-              </p>) : (<Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Waktu</TableHead>
-                    <TableHead>Lokasi</TableHead>
-                    <TableHead>Aktivitas</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {patrolNonPermanent.map((item) => (<TableRow key={item.id}>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {formatDateTime(item.surveyTime)}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {item.location.lat.toFixed(4)}, {item.location.lon.toFixed(4)}
-                      </TableCell>
-                      <TableCell className="text-sm">{item.activity}</TableCell>
-                    </TableRow>))}
-                </TableBody>
-              </Table>)}
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Sprout className="h-5 w-5 text-primary"/>
-              Permanent Resources ({patrolPermanent.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {patrolPermanent.length === 0 ? (<p className="text-sm text-muted-foreground text-center py-6">
-                Tidak ada survey permanen pada patroli ini.
-              </p>) : (<Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Waktu</TableHead>
-                    <TableHead>Tipe</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {patrolPermanent.map((item) => (<TableRow key={item.id}>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {formatDateTime(item.surveyTime)}
-                      </TableCell>
-                      <TableCell className="text-sm">{item.resourceType}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{item.status}</TableCell>
-                    </TableRow>))}
-                </TableBody>
-              </Table>)}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Megafauna */}
-      <Card className="mt-6 shadow-card">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Fish className="h-5 w-5 text-primary"/>
-            Observasi Megafauna ({patrolMegafauna.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {patrolMegafauna.length === 0 ? (<p className="text-sm text-muted-foreground text-center py-6">
-              Belum ada observasi megafauna pada patroli ini.
-            </p>) : (<Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Waktu</TableHead>
-                  <TableHead>Spesies</TableHead>
-                  <TableHead>Jumlah</TableHead>
-                  <TableHead>Lokasi</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {patrolMegafauna.map((item) => (<TableRow key={item.id}>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {formatDateTime(item.observationTime)}
-                    </TableCell>
-                    <TableCell className="text-sm">{item.speciesName}</TableCell>
-                    <TableCell className="text-sm">{item.count}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{item.locationName}</TableCell>
-                  </TableRow>))}
-              </TableBody>
-            </Table>)}
-        </CardContent>
-      </Card>
-
-      {/* Incidents */}
-      <Card className="mt-6 shadow-card">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <FileWarning className="h-5 w-5 text-primary"/>
-            Kejadian Terkait ({incidents.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {incidents.length === 0 ? (<p className="text-sm text-muted-foreground text-center py-8">
-              Belum ada kejadian tercatat pada patroli ini
-            </p>) : (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {incidents.map((incident) => (<div key={incident.id} className="p-4 rounded-lg border border-border hover:border-primary/30 cursor-pointer transition-colors" onClick={() => navigate(`/incidents/${incident.id}`)}>
-                  <div className="flex items-start justify-between gap-2">
-                    <h4 className="font-medium text-sm line-clamp-2">{incident.title}</h4>
-                    <StatusBadge status={incident.status} size="sm"/>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {incident.category}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {formatRelativeTime(incident.time)}
-                  </p>
-                </div>))}
-            </div>)}
-        </CardContent>
-      </Card>
-
-      {/* Findings */}
-      <Card className="mt-6 shadow-card">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Camera className="h-5 w-5 text-primary"/>
-              Temuan Patroli ({patrolFindings.length})
-            </CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/findings')} className="text-xs">
-              Lihat Semua
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {patrolFindings.length === 0 ? (<p className="text-sm text-muted-foreground text-center py-8">
-              Belum ada temuan yang diunggah.
-            </p>) : (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {patrolFindings.slice(0, 3).map((finding) => (<div key={finding.id} className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
-                  <div className="aspect-[4/3] w-full overflow-hidden bg-muted">
-                    <img src={finding.imageUrl} alt={`Foto temuan oleh ${finding.uploader}`} className="h-full w-full object-cover" loading="lazy"/>
-                  </div>
-                  <div className="p-4 space-y-2">
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Diunggah oleh </span>
-                      <span className="font-medium text-foreground">{finding.uploader}</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Dimasukkan {formatRelativeTime(finding.createdAt)} ({formatDateTime(finding.createdAt)})
-                    </div>
-                  </div>
-                </div>))}
-            </div>)}
-        </CardContent>
-      </Card>
-    </MainLayout>);
+    </MainLayout>
+  );
 };
+
 export default PatrolDetail;
+
+const FindingInfoItem = ({ label, value, fullWidth = false }) => (
+  <div className={fullWidth ? 'md:col-span-2 rounded-lg border border-border bg-card px-3 py-2' : 'rounded-lg border border-border bg-card px-3 py-2'}>
+    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+    <p className="mt-1 text-sm font-medium text-foreground">{`${value ?? '-'}` || '-'}</p>
+  </div>
+);

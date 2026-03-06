@@ -1,72 +1,127 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, MapPin, Ship, ShieldAlert, ClipboardList } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Camera, FileWarning, MapPin, Ship } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { MapCard } from '@/components/map/MapCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useData } from '@/context/DataContext';
+import { useToast } from '@/hooks/use-toast';
+import {
+  apiClient,
+  formatDateTime,
+  reviewClassMap,
+  reviewLabelMap,
+} from '@/lib/apiClient';
+import { AttachmentList } from '@/components/reports/AttachmentList';
+import { mapPatrolReportFindings, parseFindingId } from '@/lib/patrolFindingUtils';
+
 const FindingDetail = () => {
-    const { id } = useParams();
-    const navigate = useNavigate();
-    const { getFindingById, vesselTypes, vesselSubtypes, gearTypes, violationTypes, findingViolationItems, mediaFiles, } = useData();
-    const finding = id ? getFindingById(id) : undefined;
-    if (!finding) {
-        return (<MainLayout title="Temuan Tidak Ditemukan">
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const parsedId = useMemo(() => parseFindingId(id || ''), [id]);
+
+  const [report, setReport] = useState(null);
+  const [finding, setFinding] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const loadData = async () => {
+    if (!parsedId?.reportId) return;
+
+    setLoading(true);
+    try {
+      const reportData = await apiClient.getReportById(parsedId.reportId);
+      const findings = mapPatrolReportFindings(reportData);
+      const selectedFinding = findings.find((item) => item.id === id) || null;
+
+      setReport(reportData);
+      setFinding(selectedFinding);
+    } catch (error) {
+      toast({
+        title: 'Gagal memuat detail temuan',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  if (!parsedId) {
+    return (
+      <MainLayout title="Temuan Tidak Ditemukan">
         <Card className="shadow-card">
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">Temuan dengan ID tersebut tidak ditemukan.</p>
+            <p className="text-muted-foreground">ID temuan tidak valid.</p>
             <Button className="mt-4" onClick={() => navigate('/findings')}>
               Kembali ke Daftar
             </Button>
           </CardContent>
         </Card>
-      </MainLayout>);
-    }
-    const formatDate = (date) => {
-        return date.toLocaleDateString('id-ID', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-        });
-    };
-    const formatTime = (date) => {
-        return date.toLocaleTimeString('id-ID', {
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    };
-    const getVesselTypeName = (typeId) => {
-        const vesselType = vesselTypes.find((item) => item.id === typeId);
-        return vesselType?.name ?? '-';
-    };
-    const getVesselSubtypeName = (subtypeId) => {
-        if (!subtypeId)
-            return '-';
-        const subtype = vesselSubtypes.find((item) => item.id === subtypeId);
-        return subtype?.name ?? '-';
-    };
-    const getGearNames = (gearIds) => {
-        if (gearIds.length === 0)
-            return '-';
-        const names = gearIds
-            .map((gearId) => gearTypes.find((item) => item.id === gearId)?.name)
-            .filter(Boolean);
-        return names.length > 0 ? names.join(', ') : '-';
-    };
-    const violations = findingViolationItems
-        .filter((item) => item.findingId === finding.id)
-        .map((item) => ({
-        ...item,
-        detail: violationTypes.find((type) => type.id === item.violationTypeId),
-    }))
-        .filter((item) => item.detail);
-    const photo = mediaFiles.find((item) => item.id === finding.findingPhotoId);
-    return (<MainLayout title="Detail Temuan" subtitle={finding.locationName}>
+      </MainLayout>
+    );
+  }
+
+  if (loading && !finding) {
+    return (
+      <MainLayout title="Detail Temuan">
+        <Card className="shadow-card">
+          <CardContent className="py-12 text-center text-muted-foreground">Memuat detail temuan...</CardContent>
+        </Card>
+      </MainLayout>
+    );
+  }
+
+  if (!finding || !report) {
+    return (
+      <MainLayout title="Temuan Tidak Ditemukan">
+        <Card className="shadow-card">
+          <CardContent className="py-12 text-center">
+            <p className="text-muted-foreground">Data temuan tidak ditemukan pada laporan patroli.</p>
+            <Button className="mt-4" onClick={() => navigate('/findings')}>
+              Kembali ke Daftar
+            </Button>
+          </CardContent>
+        </Card>
+      </MainLayout>
+    );
+  }
+
+  const marker = finding.mapPoint
+    ? [
+        {
+          lat: finding.mapPoint.lat,
+          lon: finding.mapPoint.lon,
+          label: finding.locationName,
+          description: finding.hasViolation
+            ? `Pelanggaran: ${finding.violationTypes.join(', ') || '-'}`
+            : 'Tidak ada pelanggaran',
+          color: finding.hasViolation ? '#ef4444' : '#22c55e',
+        },
+      ]
+    : [];
+
+  return (
+    <MainLayout title="Detail Temuan" subtitle={finding.locationName}>
       <Button variant="ghost" size="sm" className="mb-4 -ml-2" onClick={() => navigate('/findings')}>
-        <ArrowLeft className="h-4 w-4 mr-2"/>
+        <ArrowLeft className="h-4 w-4 mr-2" />
         Kembali ke Daftar
       </Button>
+
+      <div className="flex flex-wrap items-center gap-2 mb-5">
+        <Badge className={`border ${reviewClassMap[finding.reportStatus]}`}>
+          {reviewLabelMap[finding.reportStatus]}
+        </Badge>
+        <Badge variant="outline">Laporan: {finding.reportCode}</Badge>
+        <Badge variant="outline">Waktu: {formatDateTime(finding.submittedAt)}</Badge>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -74,81 +129,109 @@ const FindingDetail = () => {
             <CardContent className="p-6">
               <div className="flex items-start gap-4">
                 <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Camera className="h-6 w-6 text-primary"/>
+                  <Camera className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-xl font-bold mb-2">{finding.locationName}</h2>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Badge variant="outline">{finding.zone}</Badge>
-                    <Badge variant="outline">{finding.subzone}</Badge>
-                    <Badge className={finding.hasTlpjlCard ? 'bg-success/15 text-success' : 'bg-destructive/10 text-destructive'}>
-                      {finding.hasTlpjlCard ? 'TLPJL: Ada' : 'TLPJL: Tidak'}
+                  <h2 className="text-xl font-bold mb-1">{finding.locationName}</h2>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Area: {finding.areaName} | Pos: {finding.postName}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline">GPS: {finding.gpsNumber}</Badge>
+                    <Badge variant="secondary">Zona: {finding.locationZone !== '-' ? finding.locationZone : finding.zoneCoordinate}</Badge>
+                    <Badge className={finding.hasViolation ? 'bg-destructive/10 text-destructive' : 'bg-success/10 text-success'}>
+                      {finding.hasViolation ? 'Ada Pelanggaran' : 'Tidak Ada Pelanggaran'}
                     </Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Tanggal Temuan: {formatDate(finding.findingTime)} · Jam: {formatTime(finding.findingTime)}
-                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <MapCard title="Lokasi Temuan" selectedVessel={{
-            name: finding.locationName,
-            lat: finding.latitude,
-            lon: finding.longitude,
-        }} markers={[
-            {
-                lat: finding.latitude,
-                lon: finding.longitude,
-                label: 'Temuan',
-                description: finding.locationName,
-                color: '#ef4444',
-            },
-        ]} showControls={false}/>
+          {finding.mapPoint ? (
+            <MapCard
+              title="Lokasi Temuan"
+              selectedVessel={{
+                name: finding.locationName,
+                lat: finding.mapPoint.lat,
+                lon: finding.mapPoint.lon,
+              }}
+              markers={marker}
+              showControls={false}
+            />
+          ) : (
+            <Card className="shadow-card">
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                Koordinat lokasi temuan belum tersedia.
+              </CardContent>
+            </Card>
+          )}
 
           <Card className="shadow-card">
             <CardHeader>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <ShieldAlert className="h-5 w-5 text-primary"/>
-                Detail Pelanggaran
+                <Ship className="h-5 w-5 text-primary" />
+                Kapal dan Awak
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Detail Pelanggaran</p>
-                <p className="text-sm">{finding.violationDetails}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Tindak Lanjut</p>
-                <p className="text-sm">{finding.actionTaken}</p>
-              </div>
+            <CardContent className="space-y-2 text-sm">
+              <p>Nama Kapal: {finding.vesselName}</p>
+              <p>Nahkoda: {finding.captainName}</p>
+              <p>Jenis Kapal: {finding.shipKind}</p>
+              <p>Kategori Kapal: {finding.shipCategory}</p>
+              <p>Asal Kapal: {finding.shipOrigin}</p>
+              <p>Tipe Mesin: {finding.engineType}</p>
+              <p>Daya Mesin: {finding.enginePower}</p>
+              <p>Jumlah Mesin: {finding.engineCount}</p>
+              <p>Jumlah ABK: {finding.crewCount}</p>
+              <p>Jumlah Penumpang: {finding.passengerCount}</p>
             </CardContent>
           </Card>
 
           <Card className="shadow-card">
             <CardHeader>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <ClipboardList className="h-5 w-5 text-primary"/>
-                Jenis Pelanggaran ({violations.length})
+                <FileWarning className="h-5 w-5 text-primary" />
+                Detail Pelanggaran dan Tindakan
               </CardTitle>
             </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Jenis Pelanggaran</p>
+                <p>{finding.violationTypes.length > 0 ? finding.violationTypes.join(', ') : '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Detail Pelanggaran</p>
+                <p>{finding.violationDetail}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Alat Tangkap</p>
+                <p>{finding.fishingTools.length > 0 ? finding.fishingTools.join(', ') : '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Tindakan</p>
+                <p>{finding.actionTaken}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">Lampiran Foto Temuan</CardTitle>
+            </CardHeader>
             <CardContent>
-              {violations.length === 0 ? (<p className="text-sm text-muted-foreground text-center py-6">
-                  Belum ada jenis pelanggaran yang ditautkan.
-                </p>) : (<div className="space-y-3">
-                  {violations.map((item) => (<div key={item.id} className="rounded-lg border border-border p-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium">{item.detail?.name}</p>
-                        <Badge variant="outline" className="text-[10px]">
-                          {item.detail?.code}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {item.detail?.description}
-                      </p>
-                    </div>))}
-                </div>)}
+              <AttachmentList items={finding.photoUrls} emptyLabel="Tidak ada foto temuan." />
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">Data Mentah Temuan (Lengkap)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <pre className="max-h-[320px] overflow-auto rounded-md bg-muted p-3 text-xs">
+                {JSON.stringify(finding.rawFinding, null, 2)}
+              </pre>
             </CardContent>
           </Card>
         </div>
@@ -157,77 +240,44 @@ const FindingDetail = () => {
           <Card className="shadow-card">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-primary"/>
-                Informasi Lokasi
+                <MapPin className="h-5 w-5 text-primary" />
+                Informasi Laporan Patroli
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Koordinat</span>
-                <span className="font-mono">
-                  {finding.latitude.toFixed(5)}, {finding.longitude.toFixed(5)}
-                </span>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Kode Laporan</span>
+                <span className="font-mono">{finding.reportCode}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">GPS ID</span>
-                <span>{finding.gpsId}</span>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Area</span>
+                <span>{finding.areaName}</span>
               </div>
-              {finding.zoneOther !== '-' && (<div className="flex justify-between">
-                  <span className="text-muted-foreground">Zona Lainnya</span>
-                  <span>{finding.zoneOther}</span>
-                </div>)}
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Ship className="h-5 w-5 text-primary"/>
-                Kapal & Alat Tangkap
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Tipe Kapal</span>
-                <span>{getVesselTypeName(finding.vesselTypeId)}</span>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Pos</span>
+                <span>{finding.postName}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Subtipe</span>
-                <span>{getVesselSubtypeName(finding.vesselSubtypeId)}</span>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Pengirim</span>
+                <span>{finding.submittedBy}</span>
               </div>
-              {finding.vesselTypeOther !== '-' && (<div className="flex justify-between">
-                  <span className="text-muted-foreground">Tipe Lainnya</span>
-                  <span>{finding.vesselTypeOther}</span>
-                </div>)}
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Alat Tangkap</span>
-                <span>{getGearNames(finding.gearTypes)}</span>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Dikirim</span>
+                <span>{formatDateTime(finding.submittedAt)}</span>
               </div>
-              {finding.gearOther !== '-' && (<div className="flex justify-between">
-                  <span className="text-muted-foreground">Alat Lainnya</span>
-                  <span>{finding.gearOther}</span>
-                </div>)}
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Camera className="h-5 w-5 text-primary"/>
-                Foto Temuan
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="rounded-lg border border-border overflow-hidden bg-muted">
-                <img src={photo?.url ?? finding.imageUrl} alt={photo?.name ?? 'Foto temuan'} className="w-full h-48 object-cover" loading="lazy"/>
+              <div>
+                <p className="text-muted-foreground mb-1">Catatan Verifikator</p>
+                <p>{finding.reviewNote}</p>
               </div>
-              <div className="text-xs text-muted-foreground">
-                <p>{photo?.name ?? 'Dokumentasi temuan'}</p>
-              </div>
+              <Button className="w-full" variant="outline" onClick={() => navigate(`/patrols/${finding.reportId}`)}>
+                Buka Detail Patroli
+              </Button>
             </CardContent>
           </Card>
         </div>
       </div>
-    </MainLayout>);
+    </MainLayout>
+  );
 };
+
 export default FindingDetail;
