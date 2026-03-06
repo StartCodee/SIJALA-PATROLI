@@ -140,8 +140,27 @@ function apiOrigin() {
   try {
     return new URL(configured).origin;
   } catch (_) {
+    if (typeof window !== 'undefined') {
+      return window.location.origin;
+    }
+    return 'http://localhost:4100';
+  }
+}
+
+function appOrigin() {
+  if (typeof window !== 'undefined') {
     return window.location.origin;
   }
+  return apiOrigin();
+}
+
+function shouldUseAppUploadProxy() {
+  if (typeof window === 'undefined') return false;
+  return window.location.protocol === 'https:';
+}
+
+function uploadBaseOrigin() {
+  return shouldUseAppUploadProxy() ? appOrigin() : apiOrigin();
 }
 
 export const normalizeAttachmentUrl = (url) => {
@@ -149,7 +168,7 @@ export const normalizeAttachmentUrl = (url) => {
   if (!raw) return '';
 
   if (raw.startsWith('/uploads/')) {
-    return `${apiOrigin()}${raw}`;
+    return `${uploadBaseOrigin()}${raw}`;
   }
 
   if (!/^https?:\/\//i.test(raw)) {
@@ -160,8 +179,10 @@ export const normalizeAttachmentUrl = (url) => {
     const parsed = new URL(raw);
     if (parsed.pathname.startsWith('/uploads/')) {
       const problematicHosts = new Set(['10.0.2.2', '127.0.0.1', 'localhost']);
-      if (problematicHosts.has(parsed.hostname)) {
-        return `${apiOrigin()}${parsed.pathname}`;
+      const mixedContentRisk = shouldUseAppUploadProxy() && parsed.protocol === 'http:';
+
+      if (problematicHosts.has(parsed.hostname) || mixedContentRisk) {
+        return `${uploadBaseOrigin()}${parsed.pathname}${parsed.search}${parsed.hash}`;
       }
     }
     return parsed.toString();
