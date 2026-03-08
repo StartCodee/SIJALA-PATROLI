@@ -32,6 +32,28 @@ const createRouteIcon = ({ symbol, color }) =>
     iconAnchor: [16, 16],
   });
 
+const createPointIcon = ({ symbol = '📍', color = '#2563eb' }) =>
+  L.divIcon({
+    className: 'sijala-point-marker',
+    html: `
+      <div style="
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        border: 2px solid white;
+        background: ${color};
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 15px;
+        box-shadow: 0 6px 14px rgba(15, 23, 42, 0.28);
+      ">${symbol}</div>
+    `,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+  });
+
 export const MapCard = ({
   title = 'Peta Pemantauan',
   selectedVessel,
@@ -68,11 +90,21 @@ export const MapCard = ({
 
   useEffect(() => {
     if (!mapRef.current) return;
-    const points = paths.flatMap((path) => path.points || []);
-    if (points.length < 2) return;
-    const bounds = points.map((point) => [point.lat, point.lon]);
-    mapRef.current.fitBounds(bounds, { padding: [24, 24] });
-  }, [paths]);
+
+    const routePoints = paths.flatMap((path) => path.points || []);
+    if (routePoints.length > 1) {
+      const bounds = routePoints.map((point) => [point.lat, point.lon]);
+      mapRef.current.fitBounds(bounds, { padding: [24, 24] });
+      return;
+    }
+
+    const markerPoints = markers
+      .filter((marker) => Number.isFinite(marker?.lat) && Number.isFinite(marker?.lon))
+      .map((marker) => [marker.lat, marker.lon]);
+    if (markerPoints.length > 1) {
+      mapRef.current.fitBounds(markerPoints, { padding: [24, 24] });
+    }
+  }, [markers, paths]);
 
   const hasRoute = paths.some((path) => Array.isArray(path.points) && path.points.length > 1);
 
@@ -162,6 +194,25 @@ export const MapCard = ({
                     {(marker.label || marker.description) && (
                       <Popup>
                         <div className="text-sm font-medium">{marker.label ?? 'Marker'}</div>
+                        {marker.description && (
+                          <div className="text-xs text-muted-foreground">{marker.description}</div>
+                        )}
+                      </Popup>
+                    )}
+                  </Marker>
+                );
+              }
+
+              if (marker.iconSymbol) {
+                const icon = createPointIcon({
+                  symbol: marker.iconSymbol,
+                  color: marker.iconColor ?? marker.color ?? '#2563eb',
+                });
+                return (
+                  <Marker key={`marker-point-${index}`} position={[marker.lat, marker.lon]} icon={icon}>
+                    {(marker.label || marker.description) && (
+                      <Popup>
+                        <div className="text-sm font-medium">{marker.label ?? 'Titik Laporan'}</div>
                         {marker.description && (
                           <div className="text-xs text-muted-foreground">{marker.description}</div>
                         )}

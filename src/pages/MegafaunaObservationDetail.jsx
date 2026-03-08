@@ -61,6 +61,8 @@ const MegafaunaObservationDetail = () => {
         label: 'Sumber Daya Tetap',
         description: fixed.type || '-',
         color: '#22c55e',
+        iconSymbol: '🪸',
+        iconColor: '#16a34a',
       });
     }
 
@@ -71,6 +73,8 @@ const MegafaunaObservationDetail = () => {
         label: 'Megafauna',
         description: megafauna.species || '-',
         color: '#3b82f6',
+        iconSymbol: '🐋',
+        iconColor: '#2563eb',
       });
     }
 
@@ -158,7 +162,24 @@ const MegafaunaObservationDetail = () => {
             }
             markers={mapMarkers}
             showControls={false}
-          />
+            showSelectedMarker={false}
+          >
+            {mapMarkers.length > 0 && (
+              <div className="absolute top-4 left-4 z-[1000] rounded-lg border border-border bg-card/95 px-3 py-2 text-xs shadow-card backdrop-blur-sm">
+                <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <span>🪸</span>
+                    <span>Sumber Daya Tetap</span>
+                  </span>
+                  <span className="text-slate-300">·</span>
+                  <span className="inline-flex items-center gap-1">
+                    <span>🐋</span>
+                    <span>Megafauna</span>
+                  </span>
+                </div>
+              </div>
+            )}
+          </MapCard>
 
           <Card className="shadow-card">
             <CardHeader>
