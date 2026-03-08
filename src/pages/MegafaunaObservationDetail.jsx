@@ -81,7 +81,7 @@ const MegafaunaObservationDetail = () => {
 
   if (loading && !report) {
     return (
-      <MainLayout title="Detail RUM">
+      <MainLayout title="Detail Monitoring Pemanfaatan (RUM)">
         <Card className="shadow-card">
           <CardContent className="py-12 text-center text-muted-foreground">Memuat detail laporan...</CardContent>
         </Card>
@@ -94,7 +94,7 @@ const MegafaunaObservationDetail = () => {
       <MainLayout title="Data Tidak Ditemukan">
         <Card className="shadow-card">
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">Laporan RUM tidak ditemukan.</p>
+            <p className="text-muted-foreground">Laporan Monitoring Pemanfaatan (RUM) tidak ditemukan.</p>
             <Button className="mt-4" onClick={() => navigate('/monitoring-megafauna')}>
               Kembali ke Daftar
             </Button>
@@ -105,7 +105,7 @@ const MegafaunaObservationDetail = () => {
   }
 
   return (
-    <MainLayout title="Detail RUM" subtitle={report.reportCode}>
+    <MainLayout title="Detail Monitoring Pemanfaatan (RUM)" subtitle={report.reportCode}>
       <Button
         variant="ghost"
         size="sm"

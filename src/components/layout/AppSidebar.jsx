@@ -50,12 +50,12 @@ const mainNavItems = [
         icon: Anchor,
     },
     {
-        title: 'Observasi Megafauna',
+        title: 'Monitoring Pemanfaatan (RUM)',
         href: '/monitoring-megafauna',
         icon: Fish,
     },
     {
-        title: 'Monitoring Habitat',
+        title: 'Monitoring Lainnya',
         href: '/monitoring-habitat',
         icon: TreePine,
     },

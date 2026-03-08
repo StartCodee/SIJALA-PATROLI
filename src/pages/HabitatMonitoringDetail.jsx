@@ -129,7 +129,7 @@ const HabitatMonitoringDetail = () => {
                   <TreePine className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-xl font-bold mb-1">Monitoring Habitat</h2>
+                  <h2 className="text-xl font-bold mb-1">Monitoring Lainnya</h2>
                   <p className="text-sm text-muted-foreground mb-3">
                     Operator: {visitorData.operatorName || '-'}
                   </p>

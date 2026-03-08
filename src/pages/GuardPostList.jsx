@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Anchor, ChevronDown, ChevronUp, Filter, Plus, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import {
+  ChevronDown,
+  ChevronUp,
+  Filter,
+  Image as ImageIcon,
+  MapPinned,
+  Plus,
+  Search,
+} from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { StatusChip } from '@/components/StatusChip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,10 +45,8 @@ import { TablePaginationBar } from '@/components/table/TablePaginationBar';
 import { useToast } from '@/hooks/use-toast';
 import { apiClient } from '@/lib/apiClient';
 
-const typeLabels = {
-  pelabuhan: 'Pelabuhan',
-  pos_jaga: 'Pos Jaga',
-};
+const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4100';
+const API_ORIGIN = RAW_API_BASE_URL.replace(/\/api\/?$/, '').replace(/\/+$/, '');
 
 const statusLabels = {
   aktif: 'Aktif',
@@ -48,205 +55,244 @@ const statusLabels = {
 
 const statusVariant = (status) => (status === 'aktif' ? 'approved' : 'rejected');
 
-const initialForm = {
+const initialAreaForm = {
   name: '',
-  type: 'pelabuhan',
+  code: '',
+  imagePath: '',
+  centerLat: '',
+  centerLon: '',
   status: 'aktif',
-  address: '',
-  contact: '',
-  lat: '',
-  lon: '',
-  notes: '',
 };
 
+function toImageUrl(imagePath) {
+  const value = String(imagePath || '').trim();
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith('/uploads/')) return `${API_ORIGIN}${value}`;
+  if (value.startsWith('uploads/')) return `${API_ORIGIN}/${value}`;
+  if (value.startsWith('/')) return value;
+  if (value.startsWith('assets/')) return `/${value}`;
+  return '';
+}
+
+function centerLabel(center) {
+  if (!center) return '-';
+  if (!Number.isFinite(center.lat) || !Number.isFinite(center.lon)) return '-';
+  return `${Number(center.lat).toFixed(4)}, ${Number(center.lon).toFixed(4)}`;
+}
+
+function parseCoordinatePair(latRaw, lonRaw) {
+  const lat = Number.parseFloat(latRaw);
+  const lon = Number.parseFloat(lonRaw);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return null;
+  }
+
+  return { lat, lon };
+}
+
 const GuardPostList = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [guardPosts, setGuardPosts] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [areas, setAreas] = useState([]);
+  const [areaLoading, setAreaLoading] = useState(false);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [showFilters, setShowFilters] = useState(true);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [areaSearchQuery, setAreaSearchQuery] = useState('');
+  const [areaStatusFilter, setAreaStatusFilter] = useState('all');
+  const [areaFilterOpen, setAreaFilterOpen] = useState(true);
+  const [areaPage, setAreaPage] = useState(1);
+  const [areaPageSize, setAreaPageSize] = useState(10);
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogMode, setDialogMode] = useState('create');
-  const [editingPost, setEditingPost] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState(initialForm);
+  const [areaDialogOpen, setAreaDialogOpen] = useState(false);
+  const [areaDialogMode, setAreaDialogMode] = useState('create');
+  const [editingArea, setEditingArea] = useState(null);
+  const [areaFormData, setAreaFormData] = useState(initialAreaForm);
+  const [areaImageFile, setAreaImageFile] = useState(null);
+  const [isAreaSubmitting, setIsAreaSubmitting] = useState(false);
 
-  const loadData = async () => {
-    setLoading(true);
+  const [deleteAreaTarget, setDeleteAreaTarget] = useState(null);
+
+  const loadAreas = async () => {
+    setAreaLoading(true);
     try {
-      const response = await apiClient.getGuardPosts();
-      setGuardPosts(response.items || []);
+      const response = await apiClient.getPatrolAreas();
+      setAreas(response.items || []);
     } catch (error) {
       toast({
-        title: 'Gagal memuat lokasi',
+        title: 'Gagal memuat kawasan',
         description: error.message,
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      setAreaLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadAreas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filteredPosts = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+  const filteredAreas = useMemo(() => {
+    const query = areaSearchQuery.trim().toLowerCase();
 
-    return guardPosts.filter((post) => {
+    return areas.filter((area) => {
       const matchesQuery =
         query.length === 0 ||
-        post.name.toLowerCase().includes(query) ||
-        post.address.toLowerCase().includes(query);
-
-      const matchesType = typeFilter === 'all' || post.type === typeFilter;
-      const matchesStatus = statusFilter === 'all' || post.status === statusFilter;
-
-      return matchesQuery && matchesType && matchesStatus;
+        area.name.toLowerCase().includes(query) ||
+        area.code.toLowerCase().includes(query);
+      const matchesStatus = areaStatusFilter === 'all' || area.status === areaStatusFilter;
+      return matchesQuery && matchesStatus;
     });
-  }, [guardPosts, searchQuery, typeFilter, statusFilter]);
+  }, [areas, areaSearchQuery, areaStatusFilter]);
+
+  const pagedAreas = useMemo(() => {
+    const from = (areaPage - 1) * areaPageSize;
+    return filteredAreas.slice(from, from + areaPageSize);
+  }, [filteredAreas, areaPage, areaPageSize]);
 
   useEffect(() => {
-    setPage(1);
-  }, [searchQuery, typeFilter, statusFilter]);
+    setAreaPage(1);
+  }, [areaSearchQuery, areaStatusFilter]);
 
-  const pagedPosts = useMemo(() => {
-    const from = (page - 1) * pageSize;
-    return filteredPosts.slice(from, from + pageSize);
-  }, [filteredPosts, page, pageSize]);
-
-  const resetForm = () => {
-    setDialogMode('create');
-    setEditingPost(null);
-    setFormData(initialForm);
+  const resetAreaForm = () => {
+    setAreaDialogMode('create');
+    setEditingArea(null);
+    setAreaFormData(initialAreaForm);
+    setAreaImageFile(null);
   };
 
-  const openCreate = () => {
-    resetForm();
-    setDialogOpen(true);
+  const openCreateArea = () => {
+    resetAreaForm();
+    setAreaDialogOpen(true);
   };
 
-  const openEdit = (post) => {
-    setDialogMode('edit');
-    setEditingPost(post);
-    setFormData({
-      name: post.name,
-      type: post.type,
-      status: post.status,
-      address: post.address,
-      contact: post.contact,
-      lat: String(post.location?.lat ?? ''),
-      lon: String(post.location?.lon ?? ''),
-      notes: post.notes || '',
+  const openEditArea = (area) => {
+    setAreaDialogMode('edit');
+    setEditingArea(area);
+    setAreaImageFile(null);
+    setAreaFormData({
+      name: area.name || '',
+      code: area.code || '',
+      imagePath: area.imagePath || '',
+      centerLat:
+        area.center && Number.isFinite(area.center.lat)
+          ? String(area.center.lat)
+          : '',
+      centerLon:
+        area.center && Number.isFinite(area.center.lon)
+          ? String(area.center.lon)
+          : '',
+      status: area.status || 'aktif',
     });
-    setDialogOpen(true);
+    setAreaDialogOpen(true);
   };
 
-  const handleCreateSubmit = async (event) => {
+  const handleAreaSubmit = async (event) => {
     event.preventDefault();
 
-    const lat = Number.parseFloat(formData.lat);
-    const lon = Number.parseFloat(formData.lon);
+    const centerLatRaw = areaFormData.centerLat.trim();
+    const centerLonRaw = areaFormData.centerLon.trim();
 
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-      toast({
-        title: 'Koordinat tidak valid',
-        description: 'Lintang dan bujur harus berupa angka.',
-        variant: 'destructive',
-      });
-      return;
+    let center = null;
+    if (centerLatRaw || centerLonRaw) {
+      center = parseCoordinatePair(centerLatRaw, centerLonRaw);
+      if (!center) {
+        toast({
+          title: 'Koordinat pusat tidak valid',
+          description: 'Lintang dan bujur harus berupa angka.',
+          variant: 'destructive',
+        });
+        return;
+      }
     }
 
-    setIsSubmitting(true);
-
-    const payload = {
-      name: formData.name.trim(),
-      type: formData.type,
-      status: formData.status,
-      address: formData.address.trim(),
-      contact: formData.contact.trim(),
-      location: {
-        lat,
-        lon,
-      },
-      notes: formData.notes.trim() || null,
-    };
-
+    setIsAreaSubmitting(true);
     try {
-      if (dialogMode === 'create') {
-        const created = await apiClient.createGuardPost(payload);
-        setGuardPosts((prev) => [created, ...prev]);
-      } else if (editingPost) {
-        const updated = await apiClient.updateGuardPost(editingPost.id, payload);
-        setGuardPosts((prev) => prev.map((post) => (post.id === updated.id ? updated : post)));
+      const payload = new FormData();
+      payload.append('name', areaFormData.name.trim());
+      payload.append('code', areaFormData.code.trim().toUpperCase());
+      payload.append('status', areaFormData.status);
+      payload.append('imagePath', areaFormData.imagePath.trim());
+
+      if (center) {
+        payload.append('centerLat', String(center.lat));
+        payload.append('centerLon', String(center.lon));
       }
+
+      if (areaImageFile) {
+        payload.append('image', areaImageFile);
+      }
+
+      if (areaDialogMode === 'create') {
+        await apiClient.createPatrolArea(payload);
+      } else if (editingArea) {
+        await apiClient.updatePatrolArea(editingArea.id, payload);
+      }
+
+      await loadAreas();
 
       toast({
         title: 'Berhasil',
         description:
-          dialogMode === 'create'
-            ? 'Data pelabuhan/pos berhasil ditambahkan.'
-            : 'Data pelabuhan/pos berhasil diperbarui.',
+          areaDialogMode === 'create'
+            ? 'Kawasan berhasil ditambahkan.'
+            : 'Kawasan berhasil diperbarui.',
       });
 
-      setDialogOpen(false);
-      resetForm();
+      setAreaDialogOpen(false);
+      resetAreaForm();
     } catch (error) {
       toast({
-        title: 'Gagal menyimpan data',
+        title: 'Gagal menyimpan kawasan',
         description: error.message,
         variant: 'destructive',
       });
     } finally {
-      setIsSubmitting(false);
+      setIsAreaSubmitting(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
+  const handleDeleteArea = async () => {
+    if (!deleteAreaTarget) return;
 
     try {
-      await apiClient.deleteGuardPost(deleteTarget.id);
-      setGuardPosts((prev) => prev.filter((post) => post.id !== deleteTarget.id));
-      toast({ title: 'Berhasil', description: 'Data lokasi berhasil dihapus.' });
+      await apiClient.deletePatrolArea(deleteAreaTarget.id);
+      await loadAreas();
+      toast({
+        title: 'Berhasil',
+        description: 'Kawasan berhasil dihapus.',
+      });
     } catch (error) {
       toast({
-        title: 'Gagal menghapus data',
+        title: 'Gagal menghapus kawasan',
         description: error.message,
         variant: 'destructive',
       });
     } finally {
-      setDeleteTarget(null);
+      setDeleteAreaTarget(null);
     }
   };
 
   return (
-    <MainLayout title="Pelabuhan/Pos Jaga" subtitle="Master data lokasi patroli dari API">
+    <MainLayout title="Pelabuhan/Pos Jaga" subtitle="Kelola master kawasan, lalu buka halaman detail untuk manajemen pos">
       <Card className="shadow-card">
         <CardHeader className="pb-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Anchor className="h-5 w-5 text-primary" />
-              Lokasi ({guardPosts.length})
+              <MapPinned className="h-5 w-5 text-primary" />
+              Kawasan ({areas.length})
             </CardTitle>
 
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative flex-1 min-w-[220px] max-w-md">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Cari lokasi..."
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Cari kawasan..."
+                  value={areaSearchQuery}
+                  onChange={(event) => setAreaSearchQuery(event.target.value)}
                   className="pl-9 bg-card"
                 />
               </div>
@@ -254,12 +300,12 @@ const GuardPostList = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowFilters((prev) => !prev)}
+                onClick={() => setAreaFilterOpen((prev) => !prev)}
                 className="gap-2"
               >
                 <Filter className="w-4 h-4" />
                 Filter
-                {showFilters ? (
+                {areaFilterOpen ? (
                   <ChevronUp className="w-3.5 h-3.5" />
                 ) : (
                   <ChevronDown className="w-3.5 h-3.5" />
@@ -267,61 +313,111 @@ const GuardPostList = () => {
               </Button>
 
               <Dialog
-                open={dialogOpen}
+                open={areaDialogOpen}
                 onOpenChange={(open) => {
-                  setDialogOpen(open);
-                  if (!open) resetForm();
+                  setAreaDialogOpen(open);
+                  if (!open) resetAreaForm();
                 }}
               >
                 <DialogTrigger asChild>
-                  <Button className="gap-2" onClick={openCreate}>
+                  <Button className="gap-2" onClick={openCreateArea}>
                     <Plus className="h-4 w-4" />
-                    Tambah Lokasi
+                    Tambah Kawasan
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>
-                      {dialogMode === 'create' ? 'Tambah Lokasi' : 'Ubah Lokasi'}
+                      {areaDialogMode === 'create' ? 'Tambah Kawasan' : 'Ubah Kawasan'}
                     </DialogTitle>
                     <DialogDescription>
-                      Kelola data pelabuhan dan pos jaga yang dipakai patroli.
+                      Master kawasan patroli untuk pemetaan area dan pos.
                     </DialogDescription>
                   </DialogHeader>
 
-                  <form onSubmit={handleCreateSubmit} className="space-y-6">
+                  <form onSubmit={handleAreaSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label>Nama Lokasi</Label>
+                        <Label>Nama Kawasan</Label>
                         <Input
-                          value={formData.name}
+                          value={areaFormData.name}
                           onChange={(event) =>
-                            setFormData((prev) => ({ ...prev, name: event.target.value }))
+                            setAreaFormData((prev) => ({ ...prev, name: event.target.value }))
                           }
                           required
                         />
                       </div>
 
                       <div className="space-y-2">
-                        <Label>Tipe</Label>
-                        <select
-                          value={formData.type}
+                        <Label>Kode Kawasan</Label>
+                        <Input
+                          value={areaFormData.code}
                           onChange={(event) =>
-                            setFormData((prev) => ({ ...prev, type: event.target.value }))
+                            setAreaFormData((prev) => ({
+                              ...prev,
+                              code: event.target.value.toUpperCase(),
+                            }))
                           }
-                          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                        >
-                          <option value="pelabuhan">Pelabuhan</option>
-                          <option value="pos_jaga">Pos Jaga</option>
-                        </select>
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2 sm:col-span-2">
+                        <Label>Path Gambar</Label>
+                        <Input
+                          value={areaFormData.imagePath}
+                          onChange={(event) =>
+                            setAreaFormData((prev) => ({ ...prev, imagePath: event.target.value }))
+                          }
+                          placeholder="Contoh: /uploads/area-ayau.jpg"
+                        />
+                      </div>
+
+                      <div className="space-y-2 sm:col-span-2">
+                        <Label>Upload Gambar Kawasan (multipart)</Label>
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={(event) => {
+                            const nextFile = event.target.files?.[0] || null;
+                            setAreaImageFile(nextFile);
+                          }}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {areaImageFile
+                            ? `File dipilih: ${areaImageFile.name}`
+                            : 'Opsional. Jika diisi, file akan diupload ke backend.'}
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Lintang Titik Tengah</Label>
+                        <Input
+                          value={areaFormData.centerLat}
+                          onChange={(event) =>
+                            setAreaFormData((prev) => ({ ...prev, centerLat: event.target.value }))
+                          }
+                          placeholder="Opsional"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Bujur Titik Tengah</Label>
+                        <Input
+                          value={areaFormData.centerLon}
+                          onChange={(event) =>
+                            setAreaFormData((prev) => ({ ...prev, centerLon: event.target.value }))
+                          }
+                          placeholder="Opsional"
+                        />
                       </div>
 
                       <div className="space-y-2">
                         <Label>Status</Label>
                         <select
-                          value={formData.status}
+                          value={areaFormData.status}
                           onChange={(event) =>
-                            setFormData((prev) => ({ ...prev, status: event.target.value }))
+                            setAreaFormData((prev) => ({ ...prev, status: event.target.value }))
                           }
                           className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                         >
@@ -329,68 +425,14 @@ const GuardPostList = () => {
                           <option value="nonaktif">Nonaktif</option>
                         </select>
                       </div>
-
-                      <div className="space-y-2">
-                        <Label>Kontak</Label>
-                        <Input
-                          value={formData.contact}
-                          onChange={(event) =>
-                            setFormData((prev) => ({ ...prev, contact: event.target.value }))
-                          }
-                          required
-                        />
-                      </div>
-
-                      <div className="space-y-2 sm:col-span-2">
-                        <Label>Alamat</Label>
-                        <Input
-                          value={formData.address}
-                          onChange={(event) =>
-                            setFormData((prev) => ({ ...prev, address: event.target.value }))
-                          }
-                          required
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Lintang</Label>
-                        <Input
-                          value={formData.lat}
-                          onChange={(event) =>
-                            setFormData((prev) => ({ ...prev, lat: event.target.value }))
-                          }
-                          required
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Bujur</Label>
-                        <Input
-                          value={formData.lon}
-                          onChange={(event) =>
-                            setFormData((prev) => ({ ...prev, lon: event.target.value }))
-                          }
-                          required
-                        />
-                      </div>
-
-                      <div className="space-y-2 sm:col-span-2">
-                        <Label>Catatan</Label>
-                        <Input
-                          value={formData.notes}
-                          onChange={(event) =>
-                            setFormData((prev) => ({ ...prev, notes: event.target.value }))
-                          }
-                        />
-                      </div>
                     </div>
 
                     <div className="flex items-center justify-end gap-3">
-                      <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                      <Button type="button" variant="outline" onClick={() => setAreaDialogOpen(false)}>
                         Batal
                       </Button>
-                      <Button type="submit" className="btn-ocean" disabled={isSubmitting}>
-                        {isSubmitting ? 'Menyimpan...' : 'Simpan'}
+                      <Button type="submit" className="btn-ocean" disabled={isAreaSubmitting}>
+                        {isAreaSubmitting ? 'Menyimpan...' : 'Simpan'}
                       </Button>
                     </div>
                   </form>
@@ -401,28 +443,15 @@ const GuardPostList = () => {
         </CardHeader>
 
         <CardContent>
-          {showFilters && (
+          {areaFilterOpen && (
             <Card className="mb-4 card-ocean animate-fade-in">
               <CardContent className="p-4">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Tipe</label>
-                    <select
-                      value={typeFilter}
-                      onChange={(event) => setTypeFilter(event.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    >
-                      <option value="all">Semua</option>
-                      <option value="pelabuhan">Pelabuhan</option>
-                      <option value="pos_jaga">Pos Jaga</option>
-                    </select>
-                  </div>
-
-                  <div>
                     <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Status</label>
                     <select
-                      value={statusFilter}
-                      onChange={(event) => setStatusFilter(event.target.value)}
+                      value={areaStatusFilter}
+                      onChange={(event) => setAreaStatusFilter(event.target.value)}
                       className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                     >
                       <option value="all">Semua</option>
@@ -437,9 +466,8 @@ const GuardPostList = () => {
                       size="sm"
                       className="text-xs"
                       onClick={() => {
-                        setTypeFilter('all');
-                        setStatusFilter('all');
-                        setSearchQuery('');
+                        setAreaStatusFilter('all');
+                        setAreaSearchQuery('');
                       }}
                     >
                       Atur Ulang Filter
@@ -453,63 +481,83 @@ const GuardPostList = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Lokasi</TableHead>
-                <TableHead>Tipe</TableHead>
-                <TableHead>Kontak</TableHead>
-                <TableHead>Koordinat</TableHead>
+                <TableHead>Gambar</TableHead>
+                <TableHead>Kawasan</TableHead>
+                <TableHead>Kode</TableHead>
+                <TableHead>Titik Tengah</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Jumlah Pos</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
             </TableHeader>
 
             <TableBody>
-              {pagedPosts.map((post) => (
-                <TableRow key={post.id}>
-                  <TableCell>
-                    <div>
-                      <p className="text-sm font-medium">{post.name}</p>
-                      <p className="text-xs text-muted-foreground">{post.address}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm">{typeLabels[post.type]}</TableCell>
-                  <TableCell className="text-sm">{post.contact}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {post.location?.lat?.toFixed(4)}, {post.location?.lon?.toFixed(4)}
-                  </TableCell>
-                  <TableCell>
-                    <StatusChip
-                      variant={statusVariant(post.status)}
-                      label={statusLabels[post.status]}
-                      showIcon={false}
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="border border-status-pending/30 bg-status-pending-bg text-status-pending hover:bg-status-pending-bg/70"
-                        onClick={() => openEdit(post)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="border border-status-rejected/30 bg-status-rejected-bg text-status-rejected hover:bg-status-rejected-bg/70"
-                        onClick={() => setDeleteTarget(post)}
-                      >
-                        Hapus
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {pagedAreas.map((area) => {
+                const imageUrl = toImageUrl(area.imagePath);
+                const postCount = Array.isArray(area.posts) ? area.posts.length : 0;
 
-              {filteredPosts.length === 0 && (
+                return (
+                  <TableRow key={area.id}>
+                    <TableCell>
+                      <div className="w-[68px] h-[42px] rounded-md border border-border bg-muted/30 overflow-hidden flex items-center justify-center">
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt={area.name}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm font-medium">{area.name}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{area.code}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{centerLabel(area.center)}</TableCell>
+                    <TableCell>
+                      <StatusChip
+                        variant={statusVariant(area.status)}
+                        label={statusLabels[area.status] || '-'}
+                        showIcon={false}
+                      />
+                    </TableCell>
+                    <TableCell className="text-sm">{postCount}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/guard-posts/${area.id}`)}
+                        >
+                          Detail Pos
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="border border-status-pending/30 bg-status-pending-bg text-status-pending hover:bg-status-pending-bg/70"
+                          onClick={() => openEditArea(area)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="border border-status-rejected/30 bg-status-rejected-bg text-status-rejected hover:bg-status-rejected-bg/70"
+                          onClick={() => setDeleteAreaTarget(area)}
+                        >
+                          Hapus
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+
+              {filteredAreas.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
-                    {loading ? 'Memuat data...' : 'Tidak ada lokasi yang cocok.'}
+                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
+                    {areaLoading ? 'Memuat data kawasan...' : 'Belum ada data kawasan.'}
                   </TableCell>
                 </TableRow>
               )}
@@ -517,34 +565,35 @@ const GuardPostList = () => {
           </Table>
 
           <TablePaginationBar
-            totalItems={filteredPosts.length}
-            page={page}
-            pageSize={pageSize}
-            onPageChange={(nextPage) => setPage(nextPage)}
+            totalItems={filteredAreas.length}
+            page={areaPage}
+            pageSize={areaPageSize}
+            onPageChange={(nextPage) => setAreaPage(nextPage)}
             onPageSizeChange={(nextSize) => {
-              setPageSize(nextSize);
-              setPage(1);
+              setAreaPageSize(nextSize);
+              setAreaPage(1);
             }}
           />
         </CardContent>
       </Card>
 
       <AlertDialog
-        open={Boolean(deleteTarget)}
+        open={Boolean(deleteAreaTarget)}
         onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
+          if (!open) setDeleteAreaTarget(null);
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Lokasi</AlertDialogTitle>
+            <AlertDialogTitle>Hapus Kawasan</AlertDialogTitle>
             <AlertDialogDescription>
-              Data {deleteTarget?.name} akan dihapus permanen. Lanjutkan?
+              Kawasan {deleteAreaTarget?.name} akan dihapus permanen. Jika masih ada pos di kawasan ini,
+              penghapusan akan ditolak.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Hapus</AlertDialogAction>
+            <AlertDialogAction onClick={handleDeleteArea}>Hapus</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

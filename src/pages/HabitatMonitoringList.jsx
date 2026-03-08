@@ -353,7 +353,7 @@ const HabitatMonitoringList = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Laporan Monitoring Habitat</AlertDialogTitle>
+            <AlertDialogTitle>Hapus Laporan Monitoring Lainnya</AlertDialogTitle>
             <AlertDialogDescription>
               Laporan {deleteTarget?.reportCode} akan dihapus permanen. Lanjutkan?
             </AlertDialogDescription>

@@ -167,13 +167,13 @@ const MegafaunaObservationList = () => {
   };
 
   return (
-    <MainLayout title="Resources Use Monitoring" subtitle="Laporan RUM dari mobile">
+    <MainLayout title="Monitoring Pemanfaatan (RUM)" subtitle="Laporan RUM dari mobile">
       <Card className="shadow-card">
         <CardHeader className="pb-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Fish className="h-5 w-5 text-primary" />
-              Laporan RUM ({reports.length})
+              Monitoring Pemanfaatan (RUM) ({reports.length})
             </CardTitle>
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative flex-1 min-w-[220px] max-w-md">
@@ -352,7 +352,7 @@ const MegafaunaObservationList = () => {
                 {filteredReports.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
-                      {loading ? 'Memuat data...' : 'Belum ada laporan RUM.'}
+                      {loading ? 'Memuat data...' : 'Belum ada laporan Monitoring Pemanfaatan (RUM).'}
                     </TableCell>
                   </TableRow>
                 )}
@@ -382,7 +382,7 @@ const MegafaunaObservationList = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Laporan Observasi Megafauna</AlertDialogTitle>
+            <AlertDialogTitle>Hapus Laporan Monitoring Pemanfaatan (RUM)</AlertDialogTitle>
             <AlertDialogDescription>
               Laporan {deleteTarget?.reportCode} akan dihapus permanen. Lanjutkan?
             </AlertDialogDescription>
