@@ -1049,11 +1049,12 @@ export const filterTrackPointsByTime = (points, vesselId, range) => {
         case '6h':
             cutoff = now - 6 * 60 * 60 * 1000;
             break;
-        case 'today':
+        case 'today': {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             cutoff = today.getTime();
             break;
+        }
     }
     return points
         .filter(p => p.vesselId === vesselId && p.timestamp.getTime() >= cutoff)

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Fish, MapPin } from 'lucide-react';
+import { ArrowLeft, Fish, MapPin, User } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { MapCard } from '@/components/map/MapCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,9 +47,23 @@ const MegafaunaObservationDetail = () => {
   }, [id]);
 
   const payload = report?.payload || {};
-  const fixed = payload.fixedResource || {};
-  const nonFixed = payload.nonFixedResource || {};
-  const megafauna = payload.megafauna || {};
+  const fixedEntries = Array.isArray(payload.fixedResources) && payload.fixedResources.length > 0
+    ? payload.fixedResources.filter((item) => item && typeof item === 'object')
+    : (payload.fixedResource && typeof payload.fixedResource === 'object' ? [payload.fixedResource] : []);
+  const nonFixedEntries = Array.isArray(payload.nonFixedResources) && payload.nonFixedResources.length > 0
+    ? payload.nonFixedResources.filter((item) => item && typeof item === 'object')
+    : (payload.nonFixedResource && typeof payload.nonFixedResource === 'object' ? [payload.nonFixedResource] : []);
+  const megafaunaEntries = Array.isArray(payload.megafaunaEntries) && payload.megafaunaEntries.length > 0
+    ? payload.megafaunaEntries.filter((item) => item && typeof item === 'object')
+    : (payload.megafauna && typeof payload.megafauna === 'object' ? [payload.megafauna] : []);
+
+  const fixed = fixedEntries[0] || {};
+  const nonFixed = nonFixedEntries[0] || {};
+  const megafauna = megafaunaEntries[0] || {};
+  const teamSnapshot = payload.teamSnapshot && typeof payload.teamSnapshot === 'object' ? payload.teamSnapshot : {};
+  const teamRoles = Array.isArray(teamSnapshot.roles) ? teamSnapshot.roles : [];
+  const teamOthers = Array.isArray(teamSnapshot.others) ? teamSnapshot.others : [];
+  const teamPhotos = Array.isArray(teamSnapshot.photoUrls) ? teamSnapshot.photoUrls : [];
 
   const mapMarkers = useMemo(() => {
     const markers = [];
@@ -136,10 +150,10 @@ const MegafaunaObservationDetail = () => {
                   <Fish className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-xl font-bold mb-1">{megafauna.species || 'Megafauna'}</h2>
-                  <p className="text-sm text-muted-foreground mb-3">
+              <h2 className="text-xl font-bold mb-1">{megafauna.species || 'Megafauna'}</h2>
+              <p className="text-sm text-muted-foreground mb-3">
                     Jumlah: {megafauna.count ?? 0} | Lokasi: {megafauna.placeName || '-'}
-                  </p>
+              </p>
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="outline">Submitted By: {report.submittedBy || '-'}</Badge>
                     <Badge variant="secondary">Status: {reviewLabelMap[report.status]}</Badge>
@@ -183,11 +197,12 @@ const MegafaunaObservationDetail = () => {
 
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle className="text-base font-semibold">Sumber Daya Tetap</CardTitle>
+              <CardTitle className="text-base font-semibold">Sumber Daya Tetap ({fixedEntries.length})</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <p>GPS: {fixed.gpsNumber || '-'}</p>
               <p>Jenis: {fixed.type || '-'}</p>
+              <p>Nama Obyek: {fixed.objectName || '-'}</p>
               <p>Fungsi/Kegunaan: {fixed.functionUse || '-'}</p>
               <p>Status Digunakan: {fixed.inUse ? 'Ya' : 'Tidak'}</p>
               <p>Jumlah Unit: {fixed.unitCount ?? 0}</p>
@@ -196,12 +211,16 @@ const MegafaunaObservationDetail = () => {
                   ? `${Number(fixed.location.lat).toFixed(6)}, ${Number(fixed.location.lon).toFixed(6)}`
                   : '-'}
               </p>
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Foto Sumber Daya Tetap</p>
+                <AttachmentList items={fixed.photoUrls || []} emptyLabel="Tidak ada foto sumber daya tetap." />
+              </div>
             </CardContent>
           </Card>
 
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle className="text-base font-semibold">Sumber Daya Tidak Tetap</CardTitle>
+              <CardTitle className="text-base font-semibold">Sumber Daya Tidak Tetap ({nonFixedEntries.length})</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <p>GPS: {nonFixed.gpsNumber || '-'}</p>
@@ -217,7 +236,7 @@ const MegafaunaObservationDetail = () => {
 
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle className="text-base font-semibold">Pemantauan Megafauna</CardTitle>
+              <CardTitle className="text-base font-semibold">Pemantauan Megafauna ({megafaunaEntries.length})</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <p>GPS: {megafauna.gpsNumber || '-'}</p>
@@ -232,6 +251,41 @@ const MegafaunaObservationDetail = () => {
               <div>
                 <p className="text-xs text-muted-foreground mb-2">Foto Megafauna</p>
                 <AttachmentList items={megafauna.photoUrls || []} emptyLabel="Tidak ada foto megafauna." />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <User className="h-5 w-5 text-primary" />
+                Snapshot Tim Lapangan
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {teamRoles.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Tidak ada snapshot tim pada laporan ini.</p>
+              ) : (
+                <div className="space-y-2">
+                  {teamRoles.map((entry, index) => (
+                    <div key={`team-role-${index}`} className="rounded-lg border border-border p-3 text-sm">
+                      <p>
+                        <span className="text-muted-foreground">Peran:</span> {entry.role || '-'}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Nama:</span> {entry.name || '-'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="text-sm">
+                <p className="text-xs text-muted-foreground mb-1">Anggota lainnya</p>
+                {teamOthers.length > 0 ? teamOthers.join(', ') : '-'}
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Swafoto Tim</p>
+                <AttachmentList items={teamPhotos} emptyLabel="Tidak ada swafoto tim." />
               </div>
             </CardContent>
           </Card>

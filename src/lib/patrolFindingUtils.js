@@ -139,7 +139,7 @@ function apiOrigin() {
   const configured = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4100/api';
   try {
     return new URL(configured).origin;
-  } catch (_) {
+  } catch {
     if (typeof window !== 'undefined') {
       return window.location.origin;
     }
@@ -186,7 +186,7 @@ export const normalizeAttachmentUrl = (url) => {
       }
     }
     return parsed.toString();
-  } catch (_) {
+  } catch {
     return raw;
   }
 };

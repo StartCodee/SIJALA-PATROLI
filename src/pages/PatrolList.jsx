@@ -28,7 +28,6 @@ import { TablePaginationBar } from '@/components/table/TablePaginationBar';
 import { useToast } from '@/hooks/use-toast';
 import {
   apiClient,
-  formatDate,
   formatDateTime,
   reviewClassMap,
   reviewLabelMap,

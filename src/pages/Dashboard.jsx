@@ -135,7 +135,7 @@ const Dashboard = () => {
                                 ? 'Patroli'
                                 : item.type === 'RESOURCE_USE_MONITORING'
                                   ? 'RUM'
-                                  : 'Monitoring Lainnya'}
+                                  : 'Monitoring Habitat'}
                             </span>
                             <span className="h-1 w-1 rounded-full bg-muted-foreground/60" />
                             <span>{formatDateTime(item.submittedAt)}</span>

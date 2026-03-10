@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, MapPin, TreePine } from 'lucide-react';
+import { ArrowLeft, MapPin, TreePine, User } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { MapCard } from '@/components/map/MapCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,14 +14,29 @@ import {
   reviewLabelMap,
 } from '@/lib/apiClient';
 import { SignaturePreview } from '@/components/reports/SignaturePreview';
+import { AttachmentList } from '@/components/reports/AttachmentList';
+
+const DEFAULT_LOCATION_POINT = { lat: -0.5508, lon: 130.5737 };
 
 const locationMap = {
-  'Manta Sandy': { lat: -0.5639, lon: 130.6636 },
-  'Manta Ridge': { lat: -0.5704, lon: 130.6542 },
-  'Arborek Jetty': { lat: -0.5448, lon: 130.5316 },
-  'Blue Magic': { lat: -0.5017, lon: 130.6614 },
-  'Cape Kri': { lat: -0.5632, lon: 130.6008 },
+  'manta sandy': { lat: -0.5639, lon: 130.6636 },
+  'manta ridge': { lat: -0.5704, lon: 130.6542 },
+  'pos dayan/batanta': { lat: -0.4436, lon: 130.5656 },
+  'pos andau/fam': { lat: -0.2679, lon: 130.0627 },
+  membarayup: { lat: -0.7239, lon: 130.5962 },
+  'irwor inbekya': { lat: -0.6118, lon: 130.7055 },
+  // Backward compatibility with older datasets
+  'arborek jetty': { lat: -0.5448, lon: 130.5316 },
+  'blue magic': { lat: -0.5017, lon: 130.6614 },
+  'cape kri': { lat: -0.5632, lon: 130.6008 },
 };
+
+function normalizeLocationKey(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
 
 const HabitatMonitoringDetail = () => {
   const { id } = useParams();
@@ -54,31 +69,40 @@ const HabitatMonitoringDetail = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const payload = report?.payload || {};
+  const payload = report?.payload && typeof report.payload === 'object' ? report.payload : {};
   const habitatEntries = Array.isArray(payload.habitatEntries) ? payload.habitatEntries : [];
-  const visitorData = payload.visitorData || {};
+  const visitorData =
+    payload.visitorData && typeof payload.visitorData === 'object' ? payload.visitorData : {};
+  const teamSnapshot = payload.teamSnapshot && typeof payload.teamSnapshot === 'object' ? payload.teamSnapshot : {};
+  const teamRoles = Array.isArray(teamSnapshot.roles) ? teamSnapshot.roles : [];
+  const teamOthers = Array.isArray(teamSnapshot.others) ? teamSnapshot.others : [];
+  const teamPhotos = Array.isArray(teamSnapshot.photoUrls) ? teamSnapshot.photoUrls : [];
+  const habitatPhotos = Array.isArray(visitorData.tjlPhotoUrls) ? visitorData.tjlPhotoUrls : [];
 
   const markers = useMemo(() => {
-    return habitatEntries
+    const entries = Array.isArray(report?.payload?.habitatEntries)
+      ? report.payload.habitatEntries
+      : [];
+
+    return entries
       .map((entry) => {
-        const point = locationMap[entry.location];
-        if (!point) return null;
+        const point = locationMap[normalizeLocationKey(entry.location)] || DEFAULT_LOCATION_POINT;
         return {
           lat: point.lat,
           lon: point.lon,
-          label: entry.location,
+          label: entry.location || 'Lokasi monitoring',
           description: `${entry.officer1 || '-'} / ${entry.time || '-'}`,
           color: '#2563eb',
         };
       })
       .filter(Boolean);
-  }, [habitatEntries]);
+  }, [report]);
 
   const selectedPoint = markers[0] || null;
 
   if (loading && !report) {
     return (
-      <MainLayout title="Detail Monitoring">
+      <MainLayout title="Detail Monitoring Habitat">
         <Card className="shadow-card">
           <CardContent className="py-12 text-center text-muted-foreground">Memuat detail laporan...</CardContent>
         </Card>
@@ -91,7 +115,7 @@ const HabitatMonitoringDetail = () => {
       <MainLayout title="Data Tidak Ditemukan">
         <Card className="shadow-card">
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">Laporan monitoring lainnya tidak ditemukan.</p>
+            <p className="text-muted-foreground">Laporan monitoring habitat tidak ditemukan.</p>
             <Button className="mt-4" onClick={() => navigate('/monitoring-habitat')}>
               Kembali ke Daftar
             </Button>
@@ -102,7 +126,7 @@ const HabitatMonitoringDetail = () => {
   }
 
   return (
-    <MainLayout title="Detail Monitoring Lainnya" subtitle={report.reportCode}>
+    <MainLayout title="Detail Monitoring Habitat" subtitle={report.reportCode}>
       <Button
         variant="ghost"
         size="sm"
@@ -129,7 +153,7 @@ const HabitatMonitoringDetail = () => {
                   <TreePine className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-xl font-bold mb-1">Monitoring Lainnya</h2>
+                  <h2 className="text-xl font-bold mb-1">Monitoring Habitat</h2>
                   <p className="text-sm text-muted-foreground mb-3">
                     Operator: {visitorData.operatorName || '-'}
                   </p>
@@ -194,7 +218,7 @@ const HabitatMonitoringDetail = () => {
 
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle className="text-base font-semibold">Data Pengunjung dan Pelanggaran</CardTitle>
+              <CardTitle className="text-base font-semibold">Data Monitoring dan Pelanggaran</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <p>Nama Operator: {visitorData.operatorName || '-'}</p>
@@ -211,6 +235,46 @@ const HabitatMonitoringDetail = () => {
               </p>
               <p>Kerusakan: {visitorData.damageDescription || '-'}</p>
               <p>Tindakan: {visitorData.actionTaken || '-'}</p>
+              <p>Solusi: {visitorData.solution || '-'}</p>
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Dokumentasi / Foto TJL</p>
+                <AttachmentList items={habitatPhotos} emptyLabel="Tidak ada foto TJL." />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <User className="h-5 w-5 text-primary" />
+                Snapshot Tim Lapangan
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {teamRoles.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Tidak ada snapshot tim pada laporan ini.</p>
+              ) : (
+                <div className="space-y-2">
+                  {teamRoles.map((entry, index) => (
+                    <div key={`team-role-${index}`} className="rounded-lg border border-border p-3 text-sm">
+                      <p>
+                        <span className="text-muted-foreground">Peran:</span> {entry.role || '-'}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Nama:</span> {entry.name || '-'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="text-sm">
+                <p className="text-xs text-muted-foreground mb-1">Anggota lainnya</p>
+                {teamOthers.length > 0 ? teamOthers.join(', ') : '-'}
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Swafoto Tim</p>
+                <AttachmentList items={teamPhotos} emptyLabel="Tidak ada swafoto tim." />
+              </div>
             </CardContent>
           </Card>
 

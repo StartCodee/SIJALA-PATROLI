@@ -55,7 +55,7 @@ const mainNavItems = [
         icon: Fish,
     },
     {
-        title: 'Monitoring Lainnya',
+        title: 'Monitoring Habitat',
         href: '/monitoring-habitat',
         icon: TreePine,
     },

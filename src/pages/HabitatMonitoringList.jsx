@@ -52,7 +52,7 @@ const HabitatMonitoringList = () => {
       setReports(response.items || []);
     } catch (error) {
       toast({
-        title: 'Gagal memuat monitoring lainnya',
+        title: 'Gagal memuat monitoring habitat',
         description: error.message,
         variant: 'destructive',
       });
@@ -96,7 +96,7 @@ const HabitatMonitoringList = () => {
     const isReject = status === 'rejected';
     const note = isReject
       ? window.prompt('Alasan pengembalian laporan:', item.reviewNote || '') || ''
-      : 'Laporan monitoring lainnya sudah sesuai.';
+      : 'Laporan monitoring habitat sudah sesuai.';
 
     if (isReject && !note.trim()) {
       toast({
@@ -154,13 +154,13 @@ const HabitatMonitoringList = () => {
   };
 
   return (
-    <MainLayout title="Monitoring Lainnya" subtitle="Laporan monitoring habitat & pengunjung dari mobile">
+    <MainLayout title="Monitoring Habitat" subtitle="Laporan monitoring habitat dari mobile">
       <Card className="shadow-card">
         <CardHeader className="pb-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <TreePine className="h-5 w-5 text-primary" />
-              Monitoring Lainnya ({reports.length})
+              Monitoring Habitat ({reports.length})
             </CardTitle>
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative flex-1 min-w-[220px] max-w-md">
@@ -323,7 +323,7 @@ const HabitatMonitoringList = () => {
                 {filteredReports.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
-                      {loading ? 'Memuat data...' : 'Belum ada laporan monitoring lainnya.'}
+                      {loading ? 'Memuat data...' : 'Belum ada laporan monitoring habitat.'}
                     </TableCell>
                   </TableRow>
                 )}
@@ -353,7 +353,7 @@ const HabitatMonitoringList = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Laporan Monitoring Lainnya</AlertDialogTitle>
+            <AlertDialogTitle>Hapus Laporan Monitoring Habitat</AlertDialogTitle>
             <AlertDialogDescription>
               Laporan {deleteTarget?.reportCode} akan dihapus permanen. Lanjutkan?
             </AlertDialogDescription>

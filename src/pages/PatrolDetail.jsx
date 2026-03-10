@@ -61,6 +61,10 @@ const PatrolDetail = () => {
 
   const patrolInfo = payload.patrolInfo || {};
   const attendance = Array.isArray(payload.attendance) ? payload.attendance : [];
+  const teamSnapshot = payload.teamSnapshot && typeof payload.teamSnapshot === 'object' ? payload.teamSnapshot : {};
+  const teamRoles = Array.isArray(teamSnapshot.roles) ? teamSnapshot.roles : [];
+  const teamOthers = Array.isArray(teamSnapshot.others) ? teamSnapshot.others : [];
+  const teamPhotos = Array.isArray(teamSnapshot.photoUrls) ? teamSnapshot.photoUrls : [];
   const fuelAndRoute = payload.fuelAndRoute || {};
   const findings = Array.isArray(payload.findings) ? payload.findings : [];
   const closing = payload.closing || {};
@@ -271,6 +275,41 @@ const PatrolDetail = () => {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <User className="h-5 w-5 text-primary" />
+                Snapshot Tim Lapangan
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {teamRoles.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Tidak ada snapshot tim pada laporan ini.</p>
+              ) : (
+                <div className="space-y-2">
+                  {teamRoles.map((entry, index) => (
+                    <div key={`team-role-${index}`} className="rounded-lg border border-border p-3 text-sm">
+                      <p>
+                        <span className="text-muted-foreground">Peran:</span> {entry.role || '-'}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Nama:</span> {entry.name || '-'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="text-sm">
+                <p className="text-xs text-muted-foreground mb-1">Anggota lainnya</p>
+                {teamOthers.length > 0 ? teamOthers.join(', ') : '-'}
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Swafoto Tim</p>
+                <AttachmentList items={teamPhotos} emptyLabel="Tidak ada swafoto tim." />
+              </div>
             </CardContent>
           </Card>
 

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { createInitialVessels, createInitialTrackPoints, createInitialPatrols, createInitialIncidents, createInitialFindings, createInitialVesselTypes, createInitialVesselSubtypes, createInitialViolationTypes, createInitialFindingViolationItems, createInitialMediaFiles, createInitialConservationAreas, createInitialGearTypes, createInitialPatrolEquipment, createInitialNonPermanentResources, createInitialPermanentResources, createInitialMegafaunaObservations, createInitialMonitoringHabitats, createInitialHabitatVisits, createInitialHabitatVisitViolationItems, createInitialCrew, createInitialGuardPosts, createInitialCrewAssignments, updateVesselPosition, generateTrackPoint, } from '@/data/mockData';
 const DataContext = createContext(undefined);
 export const DataProvider = ({ children }) => {
