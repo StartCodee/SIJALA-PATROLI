@@ -64,7 +64,7 @@ const PatrolDetail = () => {
   const attendance = Array.isArray(payload.attendance) ? payload.attendance : [];
   const teamSnapshot = payload.teamSnapshot && typeof payload.teamSnapshot === 'object' ? payload.teamSnapshot : {};
   const teamRoles = Array.isArray(teamSnapshot.roles) ? teamSnapshot.roles : [];
-  const teamOthers = Array.isArray(teamSnapshot.others) ? teamSnapshot.others : [];
+  const teamOthers = normalizeTeamOthers(teamSnapshot.others);
   const teamPhotos = Array.isArray(teamSnapshot.photoUrls) ? teamSnapshot.photoUrls : [];
   const teamHistoryRaw = Array.isArray(payload.teamHistory) ? payload.teamHistory : [];
   const fuelAndRoute = payload.fuelAndRoute || {};
@@ -119,13 +119,43 @@ const PatrolDetail = () => {
 
   const selectedPoint = routePoints[0] || findingMarkers[0] || null;
 
+  const teamSignatureFallback = useMemo(() => {
+    const map = new Map();
+    const toKey = (role, name) => `${`${role || ''}`.trim().toLowerCase()}|${`${name || ''}`.trim().toLowerCase()}`;
+    const add = (role, name, signature) => {
+      const key = toKey(role, name);
+      if (!key || key === '|') return;
+      if (!signature || typeof signature !== 'object') return;
+      if (!map.has(key)) {
+        map.set(key, signature);
+      }
+    };
+
+    for (const row of teamRoles) {
+      add(row?.role, row?.name, row?.signature);
+    }
+    for (const row of attendance) {
+      add(row?.role, row?.memberName, row?.signature);
+    }
+    return map;
+  }, [attendance, teamRoles]);
+
+  const resolveTeamSignature = (entry) => {
+    if (entry?.signature && typeof entry.signature === 'object') {
+      return entry.signature;
+    }
+    const key = `${`${entry?.role || ''}`.trim().toLowerCase()}|${`${entry?.name || ''}`.trim().toLowerCase()}`;
+    if (!key || key === '|') return null;
+    return teamSignatureFallback.get(key) || null;
+  };
+
   const teamHistoryEntries = useMemo(() => {
     const rows = teamHistoryRaw
       .map((entry) => ({
         date: `${entry?.date || ''}`.trim(),
         source: `${entry?.source || ''}`.trim() || 'unknown',
         roles: Array.isArray(entry?.roles) ? entry.roles : [],
-        others: Array.isArray(entry?.others) ? entry.others : [],
+        others: normalizeTeamOthers(entry?.others),
         photoUrls: Array.isArray(entry?.photoUrls) ? entry.photoUrls : [],
       }))
       .filter((entry) => entry.roles.length > 0 || entry.others.length > 0 || entry.photoUrls.length > 0)
@@ -153,8 +183,12 @@ const PatrolDetail = () => {
       }));
     const legacyOthers = attendance
       .filter((entry) => `${entry?.role || ''}`.trim().toLowerCase() === 'lainnya')
-      .map((entry) => `${entry?.memberName || ''}`.trim())
-      .filter(Boolean);
+      .map((entry) => ({
+        name: `${entry?.memberName || ''}`.trim(),
+        role: `${entry?.role || ''}`.trim() || 'Lainnya',
+        signature: entry?.signature,
+      }))
+      .filter((entry) => entry.name);
     if (legacyRoles.length === 0 && legacyOthers.length === 0) return [];
 
     return [
@@ -189,8 +223,12 @@ const PatrolDetail = () => {
         .filter((row) => row.role && row.name)
         .sort((a, b) => `${a.role}:${a.name}`.localeCompare(`${b.role}:${b.name}`));
       const others = (Array.isArray(entry.others) ? entry.others : [])
-        .map((name) => `${name || ''}`.trim().toLowerCase())
-        .filter(Boolean)
+        .map((row) => ({
+          role: `${row?.role || 'Lainnya'}`.trim().toLowerCase(),
+          name: `${row?.name || ''}`.trim().toLowerCase(),
+        }))
+        .filter((row) => row.name)
+        .map((row) => `${row.role}:${row.name}`)
         .sort((a, b) => a.localeCompare(b));
       return JSON.stringify({ roles, others });
     };
@@ -421,23 +459,33 @@ const PatrolDetail = () => {
                               </p>
                               <div className="mt-2">
                                 <p className="text-xs text-muted-foreground mb-1">Tanda tangan</p>
-                                <SignaturePreview signature={entry?.signature} />
+                                <SignaturePreview signature={resolveTeamSignature(entry)} />
                               </div>
                             </div>
                           ))}
                         </div>
                       )}
 
-                      <div className="text-sm">
+                      <div className="space-y-2">
                         <p className="text-xs text-muted-foreground mb-1">Anggota lainnya</p>
-                        {(Array.isArray(activeTeamRange.others) ? activeTeamRange.others : [])
-                          .map((name) => `${name || ''}`.trim())
-                          .filter(Boolean).length > 0
-                          ? (Array.isArray(activeTeamRange.others) ? activeTeamRange.others : [])
-                              .map((name) => `${name || ''}`.trim())
-                              .filter(Boolean)
-                              .join(', ')
-                          : '-'}
+                        {normalizeTeamOthers(activeTeamRange.others).length === 0 ? (
+                          <p className="text-sm text-muted-foreground">-</p>
+                        ) : (
+                          normalizeTeamOthers(activeTeamRange.others).map((entry, index) => (
+                            <div key={`team-other-active-${index}`} className="rounded-lg border border-border p-3 text-sm">
+                              <p>
+                                <span className="text-muted-foreground">Peran:</span> {entry.role || 'Lainnya'}
+                              </p>
+                              <p>
+                                <span className="text-muted-foreground">Nama:</span> {entry.name || '-'}
+                              </p>
+                              <div className="mt-2">
+                                <p className="text-xs text-muted-foreground mb-1">Tanda tangan</p>
+                                <SignaturePreview signature={entry.signature || resolveTeamSignature(entry)} />
+                              </div>
+                            </div>
+                          ))
+                        )}
                       </div>
 
                       <div>
@@ -689,6 +737,29 @@ const PatrolDetail = () => {
       </div>
     </MainLayout>
   );
+};
+
+const normalizeTeamOthers = (raw) => {
+  const list = Array.isArray(raw) ? raw : [];
+  const seen = new Set();
+  const out = [];
+
+  for (const item of list) {
+    const isObject = item && typeof item === 'object' && !Array.isArray(item);
+    const name = `${isObject ? item.name : item || ''}`.trim();
+    if (!name) continue;
+    const role = `${isObject ? item.role || 'Lainnya' : 'Lainnya'}`.trim() || 'Lainnya';
+    const key = `${role.toLowerCase()}|${name.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      name,
+      role,
+      signature: isObject ? item.signature : null,
+    });
+  }
+
+  return out;
 };
 
 const formatTeamDate = (value) => {

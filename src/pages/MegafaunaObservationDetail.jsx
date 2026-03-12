@@ -14,6 +14,28 @@ import {
   reviewLabelMap,
 } from '@/lib/apiClient';
 import { AttachmentList } from '@/components/reports/AttachmentList';
+import { SignaturePreview } from '@/components/reports/SignaturePreview';
+
+function normalizeTeamOthers(raw) {
+  const list = Array.isArray(raw) ? raw : [];
+  const seen = new Set();
+  const out = [];
+  for (const item of list) {
+    const isObject = item && typeof item === 'object' && !Array.isArray(item);
+    const name = `${isObject ? item.name : item || ''}`.trim();
+    if (!name) continue;
+    const role = `${isObject ? item.role || 'Lainnya' : 'Lainnya'}`.trim() || 'Lainnya';
+    const key = `${role.toLowerCase()}|${name.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      name,
+      role,
+      signature: isObject ? item.signature : null,
+    });
+  }
+  return out;
+}
 
 const MegafaunaObservationDetail = () => {
   const { id } = useParams();
@@ -62,7 +84,7 @@ const MegafaunaObservationDetail = () => {
   const megafauna = megafaunaEntries[0] || {};
   const teamSnapshot = payload.teamSnapshot && typeof payload.teamSnapshot === 'object' ? payload.teamSnapshot : {};
   const teamRoles = Array.isArray(teamSnapshot.roles) ? teamSnapshot.roles : [];
-  const teamOthers = Array.isArray(teamSnapshot.others) ? teamSnapshot.others : [];
+  const teamOthers = normalizeTeamOthers(teamSnapshot.others);
   const teamPhotos = Array.isArray(teamSnapshot.photoUrls) ? teamSnapshot.photoUrls : [];
 
   const mapMarkers = useMemo(() => {
@@ -275,13 +297,34 @@ const MegafaunaObservationDetail = () => {
                       <p>
                         <span className="text-muted-foreground">Nama:</span> {entry.name || '-'}
                       </p>
+                      <div className="mt-2">
+                        <p className="text-xs text-muted-foreground mb-1">Tanda tangan</p>
+                        <SignaturePreview signature={entry.signature} />
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
-              <div className="text-sm">
+              <div className="space-y-2">
                 <p className="text-xs text-muted-foreground mb-1">Anggota lainnya</p>
-                {teamOthers.length > 0 ? teamOthers.join(', ') : '-'}
+                {teamOthers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">-</p>
+                ) : (
+                  teamOthers.map((entry, index) => (
+                    <div key={`team-other-${index}`} className="rounded-lg border border-border p-3 text-sm">
+                      <p>
+                        <span className="text-muted-foreground">Peran:</span> {entry.role || 'Lainnya'}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Nama:</span> {entry.name || '-'}
+                      </p>
+                      <div className="mt-2">
+                        <p className="text-xs text-muted-foreground mb-1">Tanda tangan</p>
+                        <SignaturePreview signature={entry.signature} />
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
               <div>
                 <p className="text-xs text-muted-foreground mb-2">Swafoto Tim</p>
