@@ -25,6 +25,7 @@ import CrewDetail from "./pages/CrewDetail";
 import CrewAssignments from "./pages/CrewAssignments";
 import GuardPostList from "./pages/GuardPostList";
 import GuardPostAreaDetail from "./pages/GuardPostAreaDetail";
+import SpeedboatList from "./pages/SpeedboatList";
 import UserManagementPage from "./pages/UserManagementPage";
 import ProfilePage from "./pages/ProfilePage";
 import NotFound from "./pages/NotFound";
@@ -47,6 +48,7 @@ const App = () => (<QueryClientProvider client={queryClient}>
             <Route path="/crew-assignments" element={<CrewAssignments />}/>
             <Route path="/guard-posts" element={<GuardPostList />}/>
             <Route path="/guard-posts/:areaId" element={<GuardPostAreaDetail />}/>
+            <Route path="/speedboats" element={<SpeedboatList />}/>
             <Route path="/incidents" element={<IncidentList />}/>
             <Route path="/incidents/new" element={<IncidentCreate />}/>
             <Route path="/incidents/:id" element={<IncidentDetail />}/>

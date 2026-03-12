@@ -32,6 +32,7 @@ const PatrolDetail = () => {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  const [selectedTeamRangeIndex, setSelectedTeamRangeIndex] = useState(0);
 
   const loadReport = async () => {
     if (!id) return;
@@ -65,6 +66,7 @@ const PatrolDetail = () => {
   const teamRoles = Array.isArray(teamSnapshot.roles) ? teamSnapshot.roles : [];
   const teamOthers = Array.isArray(teamSnapshot.others) ? teamSnapshot.others : [];
   const teamPhotos = Array.isArray(teamSnapshot.photoUrls) ? teamSnapshot.photoUrls : [];
+  const teamHistoryRaw = Array.isArray(payload.teamHistory) ? payload.teamHistory : [];
   const fuelAndRoute = payload.fuelAndRoute || {};
   const findings = Array.isArray(payload.findings) ? payload.findings : [];
   const closing = payload.closing || {};
@@ -116,6 +118,118 @@ const PatrolDetail = () => {
   const markers = [...routeMarkers, ...findingMarkers];
 
   const selectedPoint = routePoints[0] || findingMarkers[0] || null;
+
+  const teamHistoryEntries = useMemo(() => {
+    const rows = teamHistoryRaw
+      .map((entry) => ({
+        date: `${entry?.date || ''}`.trim(),
+        source: `${entry?.source || ''}`.trim() || 'unknown',
+        roles: Array.isArray(entry?.roles) ? entry.roles : [],
+        others: Array.isArray(entry?.others) ? entry.others : [],
+        photoUrls: Array.isArray(entry?.photoUrls) ? entry.photoUrls : [],
+      }))
+      .filter((entry) => entry.roles.length > 0 || entry.others.length > 0 || entry.photoUrls.length > 0)
+      .sort((a, b) => `${a.date}`.localeCompare(`${b.date}`));
+
+    if (rows.length > 0) return rows;
+    if (teamRoles.length > 0 || teamOthers.length > 0 || teamPhotos.length > 0) {
+      return [
+        {
+          date: `${teamSnapshot.date || patrolInfo.departureDate || ''}`.trim(),
+          source: `${teamSnapshot.source || 'new_team'}`.trim() || 'new_team',
+          roles: teamRoles,
+          others: teamOthers,
+          photoUrls: teamPhotos,
+        },
+      ];
+    }
+
+    const legacyRoles = attendance
+      .filter((entry) => `${entry?.memberName || ''}`.trim().length > 0 && `${entry?.role || ''}`.trim().length > 0 && `${entry?.role || ''}`.trim().toLowerCase() !== 'lainnya')
+      .map((entry) => ({
+        role: `${entry?.role || ''}`.trim(),
+        name: `${entry?.memberName || ''}`.trim(),
+        signature: entry?.signature,
+      }));
+    const legacyOthers = attendance
+      .filter((entry) => `${entry?.role || ''}`.trim().toLowerCase() === 'lainnya')
+      .map((entry) => `${entry?.memberName || ''}`.trim())
+      .filter(Boolean);
+    if (legacyRoles.length === 0 && legacyOthers.length === 0) return [];
+
+    return [
+      {
+        date: `${patrolInfo.departureDate || report?.submittedAt || ''}`.trim(),
+        source: 'new_team',
+        roles: legacyRoles,
+        others: legacyOthers,
+        photoUrls: [],
+      },
+    ];
+  }, [
+    attendance,
+    patrolInfo.departureDate,
+    report?.submittedAt,
+    teamHistoryRaw,
+    teamPhotos,
+    teamOthers,
+    teamRoles,
+    teamSnapshot.date,
+    teamSnapshot.source,
+  ]);
+
+  const teamHistoryRanges = useMemo(() => {
+    if (teamHistoryEntries.length === 0) return [];
+    const toKey = (entry) => {
+      const roles = (Array.isArray(entry.roles) ? entry.roles : [])
+        .map((row) => ({
+          role: `${row?.role || ''}`.trim().toLowerCase(),
+          name: `${row?.name || ''}`.trim().toLowerCase(),
+        }))
+        .filter((row) => row.role && row.name)
+        .sort((a, b) => `${a.role}:${a.name}`.localeCompare(`${b.role}:${b.name}`));
+      const others = (Array.isArray(entry.others) ? entry.others : [])
+        .map((name) => `${name || ''}`.trim().toLowerCase())
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b));
+      return JSON.stringify({ roles, others });
+    };
+
+    const ranges = [];
+    for (const entry of teamHistoryEntries) {
+      const key = toKey(entry);
+      const last = ranges[ranges.length - 1];
+      if (!last || last.key !== key) {
+        ranges.push({
+          key,
+          startDate: entry.date,
+          endDate: entry.date,
+          source: entry.source,
+          roles: entry.roles,
+          others: entry.others,
+          photoUrls: Array.isArray(entry.photoUrls) ? [...entry.photoUrls] : [],
+        });
+      } else {
+        last.endDate = entry.date || last.endDate;
+        last.photoUrls = [
+          ...new Set([
+            ...(Array.isArray(last.photoUrls) ? last.photoUrls : []),
+            ...(Array.isArray(entry.photoUrls) ? entry.photoUrls : []),
+          ]),
+        ];
+      }
+    }
+    return ranges;
+  }, [teamHistoryEntries]);
+
+  useEffect(() => {
+    setSelectedTeamRangeIndex((prev) => {
+      if (teamHistoryRanges.length === 0) return 0;
+      return prev < teamHistoryRanges.length ? prev : 0;
+    });
+  }, [teamHistoryRanges.length]);
+
+  const activeTeamRange = teamHistoryRanges[selectedTeamRangeIndex] || null;
 
   const submitReview = async (status) => {
     if (!report) return;
@@ -251,65 +365,92 @@ const PatrolDetail = () => {
             <CardHeader>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <User className="h-5 w-5 text-primary" />
-                Daftar Hadir dan Tanda Tangan ({attendance.length})
+                Daftar Hadir Tim ({teamHistoryRanges.length})
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {attendance.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Tidak ada data daftar hadir.</p>
+              {teamHistoryRanges.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Tidak ada data daftar hadir tim.</p>
               ) : (
-                <div className="space-y-4">
-                  {attendance.map((entry, index) => (
-                    <div key={`attendance-${index}`} className="rounded-lg border border-border p-3">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                        <p>Nama: {entry.memberName || '-'}</p>
-                        <p>Peran: {entry.role || '-'}</p>
-                        <p>Instansi: {entry.agency || '-'}</p>
-                        <p>ID Personel: {entry.memberId || '-'}</p>
-                      </div>
-                      <div className="mt-3">
-                        <p className="text-xs text-muted-foreground mb-2">Tanda tangan</p>
-                        <SignaturePreview signature={entry.signature} />
-                      </div>
+                <div className="space-y-3">
+                  {teamHistoryRanges.length > 1 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {teamHistoryRanges.map((range, index) => {
+                        const active = index === selectedTeamRangeIndex;
+                        return (
+                          <button
+                            key={`team-range-tab-${index}`}
+                            type="button"
+                            onClick={() => setSelectedTeamRangeIndex(index)}
+                            className={[
+                              'rounded-full border px-3 py-1.5 text-xs font-semibold transition',
+                              active
+                                ? 'border-primary bg-primary text-primary-foreground'
+                                : 'border-border bg-background text-muted-foreground hover:text-foreground',
+                            ].join(' ')}
+                          >
+                            {formatTeamPeriod(range.startDate, range.endDate)}
+                          </button>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  ) : null}
 
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <User className="h-5 w-5 text-primary" />
-                Snapshot Tim Lapangan
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {teamRoles.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Tidak ada snapshot tim pada laporan ini.</p>
-              ) : (
-                <div className="space-y-2">
-                  {teamRoles.map((entry, index) => (
-                    <div key={`team-role-${index}`} className="rounded-lg border border-border p-3 text-sm">
-                      <p>
-                        <span className="text-muted-foreground">Peran:</span> {entry.role || '-'}
-                      </p>
-                      <p>
-                        <span className="text-muted-foreground">Nama:</span> {entry.name || '-'}
-                      </p>
+                  {activeTeamRange ? (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="secondary">
+                          Periode: {formatTeamPeriod(activeTeamRange.startDate, activeTeamRange.endDate)}
+                        </Badge>
+                        <Badge className={teamSourceClassName(activeTeamRange.source)}>
+                          {labelTeamSource(activeTeamRange.source)}
+                        </Badge>
+                      </div>
+
+                      {(Array.isArray(activeTeamRange.roles) ? activeTeamRange.roles : []).length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Belum ada anggota tim pada periode ini.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {(Array.isArray(activeTeamRange.roles) ? activeTeamRange.roles : []).map((entry, index) => (
+                            <div key={`team-role-active-${index}`} className="rounded-lg border border-border p-3 text-sm">
+                              <p>
+                                <span className="text-muted-foreground">Peran:</span> {entry?.role || '-'}
+                              </p>
+                              <p>
+                                <span className="text-muted-foreground">Nama:</span> {entry?.name || '-'}
+                              </p>
+                              <div className="mt-2">
+                                <p className="text-xs text-muted-foreground mb-1">Tanda tangan</p>
+                                <SignaturePreview signature={entry?.signature} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="text-sm">
+                        <p className="text-xs text-muted-foreground mb-1">Anggota lainnya</p>
+                        {(Array.isArray(activeTeamRange.others) ? activeTeamRange.others : [])
+                          .map((name) => `${name || ''}`.trim())
+                          .filter(Boolean).length > 0
+                          ? (Array.isArray(activeTeamRange.others) ? activeTeamRange.others : [])
+                              .map((name) => `${name || ''}`.trim())
+                              .filter(Boolean)
+                              .join(', ')
+                          : '-'}
+                      </div>
+
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">Swafoto Tim</p>
+                        <AttachmentList
+                          items={(Array.isArray(activeTeamRange.photoUrls) ? activeTeamRange.photoUrls : []).length > 0 ? activeTeamRange.photoUrls : teamPhotos}
+                          emptyLabel="Tidak ada swafoto tim."
+                        />
+                      </div>
                     </div>
-                  ))}
+                  ) : null}
                 </div>
               )}
-              <div className="text-sm">
-                <p className="text-xs text-muted-foreground mb-1">Anggota lainnya</p>
-                {teamOthers.length > 0 ? teamOthers.join(', ') : '-'}
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Swafoto Tim</p>
-                <AttachmentList items={teamPhotos} emptyLabel="Tidak ada swafoto tim." />
-              </div>
             </CardContent>
           </Card>
 
@@ -548,6 +689,52 @@ const PatrolDetail = () => {
       </div>
     </MainLayout>
   );
+};
+
+const formatTeamDate = (value) => {
+  const raw = `${value || ''}`.trim();
+  if (!raw) return '-';
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return raw;
+  return parsed.toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
+const formatTeamPeriod = (startDate, endDate) => {
+  const start = formatTeamDate(startDate);
+  const end = formatTeamDate(endDate);
+  if (start === '-' && end === '-') return '-';
+  if (start === end) return start;
+  return `${start} s/d ${end}`;
+};
+
+const labelTeamSource = (source) => {
+  switch (`${source || ''}`.trim()) {
+    case 'new_team':
+      return 'Tim Baru';
+    case 'same_team':
+      return 'Tim Sama';
+    case 'changed_team':
+      return 'Tim Berubah';
+    default:
+      return 'Tidak diketahui';
+  }
+};
+
+const teamSourceClassName = (source) => {
+  switch (`${source || ''}`.trim()) {
+    case 'new_team':
+      return 'border border-sky-200 bg-sky-50 text-sky-700';
+    case 'same_team':
+      return 'border border-emerald-200 bg-emerald-50 text-emerald-700';
+    case 'changed_team':
+      return 'border border-amber-200 bg-amber-50 text-amber-700';
+    default:
+      return 'border border-slate-200 bg-slate-50 text-slate-700';
+  }
 };
 
 export default PatrolDetail;

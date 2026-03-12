@@ -170,6 +170,34 @@ export const apiClient = {
       method: 'DELETE',
     });
   },
+
+  getSpeedboats(params = {}) {
+    return request(`/speedboats${toQuery(params)}`);
+  },
+
+  getSpeedboatById(id) {
+    return request(`/speedboats/${id}`);
+  },
+
+  createSpeedboat(payload) {
+    return request('/speedboats', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  updateSpeedboat(id, payload) {
+    return request(`/speedboats/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteSpeedboat(id) {
+    return request(`/speedboats/${id}`, {
+      method: 'DELETE',
+    });
+  },
 };
 
 export const reviewLabelMap = {

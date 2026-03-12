@@ -5,6 +5,7 @@ import {
   Route,
   Users,
   Anchor,
+  Ship,
   FileWarning,
   LogOut,
   ChevronLeft,
@@ -48,6 +49,11 @@ const mainNavItems = [
         title: 'Pelabuhan/Pos Jaga',
         href: '/guard-posts',
         icon: Anchor,
+    },
+    {
+        title: 'Management Speedboat',
+        href: '/speedboats',
+        icon: Ship,
     },
     {
         title: 'Monitoring Pemanfaatan (RUM)',
