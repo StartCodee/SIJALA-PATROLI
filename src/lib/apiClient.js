@@ -9,7 +9,6 @@ const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:
 const RAW_SSO_PORTAL_URL = import.meta.env.VITE_SSO_PORTAL_URL || 'http://localhost:9000';
 
 
-const SSO_API_BASE_URL = `${SSO_PORTAL_URL}/api`;
 
 async function ssoRequest(path, options = {}) {
   const hasFormDataBody = options.body instanceof FormData;
@@ -43,6 +42,9 @@ function normalizeBaseUrl(baseUrl) {
 }
 
 export const SSO_PORTAL_URL = normalizeBaseUrl(RAW_SSO_PORTAL_URL);
+
+const SSO_API_BASE_URL = `${SSO_PORTAL_URL}/api`;
+
 
 const normalizedBase = normalizeBaseUrl(RAW_API_BASE_URL);
 const API_BASE_URL = normalizedBase.endsWith('/api')
