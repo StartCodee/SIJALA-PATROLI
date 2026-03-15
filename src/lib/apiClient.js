@@ -1,10 +1,18 @@
-import { clearAuthSession, getAuthSession, setAuthSession } from '@/lib/authStorage';
+import {
+  clearAuthSession,
+  getAuthSession,
+  getAuthSource,
+  setAuthSession,
+} from '@/lib/authStorage';
 
 const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4200';
+const RAW_SSO_PORTAL_URL = import.meta.env.VITE_SSO_PORTAL_URL || 'http://localhost:9000';
 
 function normalizeBaseUrl(baseUrl) {
   return String(baseUrl || '').trim().replace(/\/+$/, '');
 }
+
+export const SSO_PORTAL_URL = normalizeBaseUrl(RAW_SSO_PORTAL_URL);
 
 const normalizedBase = normalizeBaseUrl(RAW_API_BASE_URL);
 const API_BASE_URL = normalizedBase.endsWith('/api')
@@ -54,6 +62,7 @@ function persistSession(authPayload) {
     accessToken: authPayload.accessToken,
     user: authPayload.user || null,
     expiresIn: authPayload.expiresIn || 0,
+    authSource: String(authPayload.authSource || getAuthSource() || '').trim() || null,
   };
 
   if (!session.accessToken) {
@@ -165,6 +174,10 @@ export const apiClient = {
     return getAuthSession();
   },
 
+  getStoredAuthSource() {
+    return getAuthSource();
+  },
+
   clearSession() {
     clearAuthSession();
   },
@@ -181,8 +194,10 @@ export const apiClient = {
         password,
       }),
     });
-    persistSession(payload);
-    return payload;
+    return persistSession({
+      ...payload,
+      authSource: 'password',
+    });
   },
 
   async exchangeSsoCode({ code, state }) {
@@ -194,8 +209,10 @@ export const apiClient = {
       },
       body: JSON.stringify({ code, state }),
     });
-    persistSession(payload);
-    return payload;
+    return persistSession({
+      ...payload,
+      authSource: 'sso',
+    });
   },
 
   getSsoLoginUrl() {
@@ -278,6 +295,23 @@ export const apiClient = {
     return {
       logoutUrl,
     };
+  },
+
+  async hasActiveSsoPortalSession() {
+    try {
+      const response = await fetch(`${SSO_PORTAL_URL}/api/session`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const payload = await response.json();
+      return payload?.authenticated === true;
+    } catch {
+      return null;
+    }
   },
 
   async restoreSessionFromCookie() {

@@ -15,6 +15,22 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
 
   async function bootstrap() {
+    const authSource = apiClient.getStoredAuthSource();
+    if (authSource === 'sso') {
+      const hasPortalSession = await apiClient.hasActiveSsoPortalSession();
+      if (hasPortalSession === false) {
+        try {
+          await apiClient.logout({ global: false, redirect: false });
+        } catch {
+          apiClient.clearSession();
+        }
+        setIsAuthenticated(false);
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+    }
+
     const session = apiClient.getStoredSession();
     const hasAccessToken = Boolean(session?.accessToken);
 
