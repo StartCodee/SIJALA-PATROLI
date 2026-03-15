@@ -11,6 +11,13 @@
   force = true
 
 [[redirects]]
+  from = "/sso/*"
+  to = "http://202.74.75.177:9000/:splat"
+  status = 200
+  force = true
+
+  
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
