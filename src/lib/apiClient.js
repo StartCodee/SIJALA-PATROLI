@@ -8,6 +8,36 @@ import {
 const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4200';
 const RAW_SSO_PORTAL_URL = import.meta.env.VITE_SSO_PORTAL_URL || 'http://localhost:9000';
 
+
+const SSO_API_BASE_URL = `${SSO_PORTAL_URL}/api`;
+
+async function ssoRequest(path, options = {}) {
+  const hasFormDataBody = options.body instanceof FormData;
+  const baseHeaders = hasFormDataBody ? {} : { 'Content-Type': 'application/json' };
+
+  let response;
+  try {
+    response = await fetch(`${SSO_API_BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        ...baseHeaders,
+        ...(options.headers || {}),
+      },
+      credentials: 'include',
+    });
+  } catch (error) {
+    throw networkError(
+      `Tidak dapat terhubung ke SSO Portal (${SSO_API_BASE_URL}).`,
+      error,
+    );
+  }
+
+  return parseResponse(response);
+}
+
+
+
+
 function normalizeBaseUrl(baseUrl) {
   return String(baseUrl || '').trim().replace(/\/+$/, '');
 }
@@ -216,86 +246,84 @@ export const apiClient = {
   },
 
   getSsoLoginUrl() {
-    return request('/auth/sso/login-url', {
+    return ssoRequest('/auth/sso/login-url', {
       auth: false,
     });
   },
 
   getSsoLogoutUrl() {
-    return request('/auth/sso/logout-url', {
+    return ssoRequest('/auth/sso/logout-url', {
       auth: false,
     });
   },
 
-  async prepareSsoAuthorizeUrl() {
-    // Mulai login SSO sebagai sesi baru untuk mencegah state lama membingungkan.
+ async prepareSsoAuthorizeUrl() {
+  // logout lokal app dulu, bukan SSO
+  try {
+    await request('/auth/logout', {
+      method: 'POST',
+      auth: false,
+      headers: {
+        ...COOKIE_AUTH_HEADERS,
+      },
+    });
+  } catch {
+    // best effort
+  } finally {
+    clearAuthSession();
+  }
+
+  const payload = await ssoRequest('/auth/login-url');
+
+  const authorizeUrl = String(payload?.authorizeUrl || '').trim();
+  if (!authorizeUrl) {
+    throw new Error('URL login SSO tidak tersedia.');
+  }
+
+  return authorizeUrl;
+},
+
+
+
+ async logout(options = {}) {
+  const {
+    global = true,
+    redirect = true,
+  } = options;
+
+  let logoutUrl = null;
+
+  if (global) {
     try {
-      await request('/auth/logout', {
-        method: 'POST',
-        auth: false,
-        headers: {
-          ...COOKIE_AUTH_HEADERS,
-        },
-      });
-    } catch {
-      // Best effort: tetap lanjutkan flow SSO.
-    } finally {
-      clearAuthSession();
-    }
-
-    const payload = await request('/auth/sso/login-url', {
-      auth: false,
-    });
-
-    const authorizeUrl = String(payload?.authorizeUrl || '').trim();
-    if (!authorizeUrl) {
-      throw new Error('URL login SSO tidak tersedia.');
-    }
-
-    return authorizeUrl;
-  },
-
-  async logout(options = {}) {
-    const {
-      global = true,
-      redirect = true,
-    } = options;
-    let logoutUrl = null;
-
-    if (global) {
-      try {
-        const payload = await request('/auth/sso/logout-url', {
-          auth: false,
-        });
-        const candidate = String(payload?.logoutUrl || '').trim();
-        if (candidate) {
-          logoutUrl = candidate;
-        }
-      } catch {
-        // Best effort: tetap lanjut logout lokal app.
+      const payload = await ssoRequest('/auth/logout-url');
+      const candidate = String(payload?.logoutUrl || '').trim();
+      if (candidate) {
+        logoutUrl = candidate;
       }
+    } catch {
+      // best effort
     }
+  }
 
-    try {
-      await request('/auth/logout', {
-        method: 'POST',
-        auth: false,
-        headers: {
-          ...COOKIE_AUTH_HEADERS,
-        },
-      });
-    } finally {
-      clearAuthSession();
-    }
+  // logout lokal app API
+  try {
+    await request('/auth/logout', {
+      method: 'POST',
+      auth: false,
+      headers: {
+        ...COOKIE_AUTH_HEADERS,
+      },
+    });
+  } finally {
+    clearAuthSession();
+  }
 
-    if (global && redirect && logoutUrl) {
-      window.location.assign(logoutUrl);
-    }
+  if (global && redirect && logoutUrl) {
+    window.location.assign(logoutUrl);
+  }
 
-    return {
-      logoutUrl,
-    };
-  },
+  return { logoutUrl };
+},
 
   async hasActiveSsoPortalSession() {
     try {
