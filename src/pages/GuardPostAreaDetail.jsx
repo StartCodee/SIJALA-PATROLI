@@ -84,6 +84,7 @@ function toImageUrl(imagePath) {
   return '';
 }
 
+
 function centerLabel(center) {
   if (!center) return '-';
   if (!Number.isFinite(center.lat) || !Number.isFinite(center.lon)) return '-';
