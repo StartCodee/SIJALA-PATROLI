@@ -1,22 +1,25 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  Route,
-  Users,
-  Anchor,
+    LayoutDashboard,
+    Route,
+    Users,
+    Anchor,
   Ship,
   FileWarning,
   LogOut,
   ChevronLeft,
   ChevronRight,
   Camera,
-  Fish,
-  TreePine,
-  ChevronDown,
-  ChevronUp,
+    Fish,
+    TreePine,
+    ChevronDown,
+    ChevronUp,
+    ShieldCheck,
+    ArrowUpRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
 import LogoKkpRajaAmpat from '@/assets/KKP-RajaAmpat.png';
 import TribbleImage from '@/assets/image/tribble.png';
 const mainNavItems = [
@@ -83,17 +86,25 @@ const patrolGroupItems = [
         icon: Camera,
     },
 ];
-const adminItems = [
-   
-];
-const profileInfo = {
-    name: 'Rudi Hartono',
-    role: 'Admin',
-    initials: 'RH',
-    avatar: '/placeholder.svg',
-};
 export const AppSidebar = ({ collapsed, onToggle }) => {
+    const auth = useAuth();
     const location = useLocation();
+    const ssoPortalBaseUrl = String(import.meta.env.VITE_SSO_PORTAL_URL || 'http://localhost:9000').replace(/\/+$/, '');
+    const ssoPortalHomeUrl = `${ssoPortalBaseUrl}/`;
+    const ssoProfileUrl = `${ssoPortalBaseUrl}/#/profile`;
+    const userName = auth.user?.fullName || auth.user?.name || 'Pengguna';
+    const userRole = String(auth.user?.role || 'viewer');
+    const profileInfo = {
+        name: userName,
+        role: userRole,
+        initials: userName
+            .split(' ')
+            .map((part) => part?.[0] || '')
+            .join('')
+            .slice(0, 2)
+            .toUpperCase() || 'US',
+        avatar: auth.user?.photoUrl || '/placeholder.svg',
+    };
     const isPathActive = (href) => location.pathname === href ||
         (href !== '/' && location.pathname.startsWith(`${href}/`));
     const patrolGroupActive = patrolGroupItems.some((item) => isPathActive(item.href));
@@ -102,6 +113,13 @@ export const AppSidebar = ({ collapsed, onToggle }) => {
         if (patrolGroupActive)
             setPatrolGroupOpen(true);
     }, [patrolGroupActive]);
+    const handleLogout = async () => {
+        await auth.logout();
+    };
+    const renderExternalNavItem = (item) => (<a key={item.href} href={item.href} className={cn('nav-item', collapsed && 'justify-center px-2')} title={collapsed ? item.title : undefined}>
+        <item.icon className="w-5 h-5 shrink-0"/>
+        {!collapsed && <span className="truncate">{item.title}</span>}
+      </a>);
     return (<aside className={cn('fixed inset-y-0 left-0 z-40 flex h-screen flex-col bg-sidebar border-r border-sidebar-border transition-[width] duration-300 shadow-2xl', collapsed ? 'w-16' : 'w-64')} style={{ background: 'var(--gradient-sidebar)' }}>
       {/* Logo */}
       <div className="flex items-center gap-3 p-4 border-b border-sidebar-border">
@@ -154,29 +172,19 @@ export const AppSidebar = ({ collapsed, onToggle }) => {
                 </div>
               </div>
             </div>)}
+
+          {renderExternalNavItem({
+            title: 'Portal SSO',
+            href: ssoPortalHomeUrl,
+            icon: ShieldCheck,
+          })}
         </div>
 
-        {adminItems.length > 0 && (<>
-            {!collapsed && (<p className="mt-6 text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-wider px-4 mb-2">
-                Administrasi
-              </p>)}
-            <div className="space-y-1">
-              {adminItems.map((item) => {
-                const isActive = isPathActive(item.href);
-                return (<NavLink key={item.href} to={item.href} className={cn('nav-item', isActive && 'active', collapsed && 'justify-center px-2')} title={collapsed ? item.title : undefined}>
-                    <item.icon className="w-5 h-5 shrink-0"/>
-                    {!collapsed && <span className="truncate">{item.title}</span>}
-                  </NavLink>);
-            })}
-            </div>
-          </>)}
       </nav>
 
       <div className={cn('border-t border-sidebar-border p-4', collapsed && 'flex flex-col items-center gap-2')}>
         {!collapsed ? (<div className="flex items-center gap-2">
-            <NavLink to="/profile" className={({ isActive }) => cn('flex flex-1 items-center gap-3 rounded-lg p-2 transition-colors', isActive
-                ? 'bg-sidebar-primary/15 text-sidebar-primary'
-                : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground')}>
+            <a href={ssoProfileUrl} className="flex flex-1 items-center gap-3 rounded-lg p-2 text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground">
               <div className="h-9 w-9 rounded-full bg-sidebar-primary/20 flex items-center justify-center overflow-hidden">
                 <img src={profileInfo.avatar} alt={profileInfo.name} className="h-full w-full object-cover"/>
               </div>
@@ -184,19 +192,20 @@ export const AppSidebar = ({ collapsed, onToggle }) => {
                 <p className="text-sm font-medium truncate">{profileInfo.name}</p>
                 <p className="text-[10px] text-sidebar-foreground/60">{profileInfo.role}</p>
               </div>
-            </NavLink>
-            <button type="button" className="p-2 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors" aria-label="Keluar" title="Keluar">
+            </a>
+            <a href={ssoProfileUrl} className="p-2 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors" aria-label="Buka profil SSO" title="Buka profil SSO">
+              <ArrowUpRight className="w-4 h-4"/>
+            </a>
+            <button type="button" onClick={handleLogout} className="p-2 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors" aria-label="Keluar" title="Keluar">
               <LogOut className="w-4 h-4"/>
             </button>
           </div>) : (<>
-            <NavLink to="/profile" className={({ isActive }) => cn('flex items-center justify-center rounded-lg p-2 transition-colors', isActive
-                ? 'bg-sidebar-primary/15 text-sidebar-primary'
-                : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground')} title="Profil Akun">
+            <a href={ssoProfileUrl} className="flex items-center justify-center rounded-lg p-2 text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground" title="Profil SSO">
               <div className="h-9 w-9 rounded-full bg-sidebar-primary/20 flex items-center justify-center overflow-hidden text-xs font-semibold text-sidebar-primary">
                 {profileInfo.initials}
               </div>
-            </NavLink>
-            <button type="button" className="p-2 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors" aria-label="Keluar" title="Keluar">
+            </a>
+            <button type="button" onClick={handleLogout} className="p-2 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors" aria-label="Keluar" title="Keluar">
               <LogOut className="w-4 h-4"/>
             </button>
           </>)}

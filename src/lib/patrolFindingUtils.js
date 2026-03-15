@@ -136,14 +136,14 @@ export const mapPatrolReportsToIncidents = (reports = []) =>
 export const isWebImageUrl = (url) => typeof url === 'string' && /^https?:\/\//i.test(url.trim());
 
 function apiOrigin() {
-  const configured = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4100/api';
+  const configured = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4200/api';
   try {
     return new URL(configured).origin;
   } catch {
     if (typeof window !== 'undefined') {
       return window.location.origin;
     }
-    return 'http://localhost:4100';
+    return 'http://localhost:4200';
   }
 }
 

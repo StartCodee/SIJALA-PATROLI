@@ -1,74 +1,313 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { DataProvider } from "@/context/DataContext";
-// Pages
-import Dashboard from "./pages/Dashboard";
-import LiveMonitoring from "./pages/LiveMonitoring";
-import VesselList from "./pages/VesselList";
-import VesselDetail from "./pages/VesselDetail";
-import PatrolList from "./pages/PatrolList";
-import PatrolDetail from "./pages/PatrolDetail";
-import IncidentList from "./pages/IncidentList";
-import IncidentCreate from "./pages/IncidentCreate";
-import IncidentDetail from "./pages/IncidentDetail";
-import Findings from "./pages/Findings";
-import FindingDetail from "./pages/FindingDetail";
-import MegafaunaObservationList from "./pages/MegafaunaObservationList";
-import MegafaunaObservationDetail from "./pages/MegafaunaObservationDetail";
-import HabitatMonitoringList from "./pages/HabitatMonitoringList";
-import HabitatMonitoringDetail from "./pages/HabitatMonitoringDetail";
-import CrewList from "./pages/CrewList";
-import CrewDetail from "./pages/CrewDetail";
-import CrewAssignments from "./pages/CrewAssignments";
-import GuardPostList from "./pages/GuardPostList";
-import GuardPostAreaDetail from "./pages/GuardPostAreaDetail";
-import SpeedboatList from "./pages/SpeedboatList";
-import UserManagementPage from "./pages/UserManagementPage";
-import ProfilePage from "./pages/ProfilePage";
-import NotFound from "./pages/NotFound";
+import { useEffect } from 'react';
+import { Toaster } from '@/components/ui/toaster';
+import { Toaster as Sonner } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { DataProvider } from '@/context/DataContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
+import Dashboard from './pages/Dashboard';
+import LiveMonitoring from './pages/LiveMonitoring';
+import VesselList from './pages/VesselList';
+import VesselDetail from './pages/VesselDetail';
+import PatrolList from './pages/PatrolList';
+import PatrolDetail from './pages/PatrolDetail';
+import IncidentList from './pages/IncidentList';
+import IncidentCreate from './pages/IncidentCreate';
+import IncidentDetail from './pages/IncidentDetail';
+import Findings from './pages/Findings';
+import FindingDetail from './pages/FindingDetail';
+import MegafaunaObservationList from './pages/MegafaunaObservationList';
+import MegafaunaObservationDetail from './pages/MegafaunaObservationDetail';
+import HabitatMonitoringList from './pages/HabitatMonitoringList';
+import HabitatMonitoringDetail from './pages/HabitatMonitoringDetail';
+import CrewList from './pages/CrewList';
+import CrewDetail from './pages/CrewDetail';
+import CrewAssignments from './pages/CrewAssignments';
+import GuardPostList from './pages/GuardPostList';
+import GuardPostAreaDetail from './pages/GuardPostAreaDetail';
+import SpeedboatList from './pages/SpeedboatList';
+import UserManagementPage from './pages/UserManagementPage';
+import LoginPage from './pages/LoginPage';
+import AuthCallbackPage from './pages/AuthCallbackPage';
+import NotFound from './pages/NotFound';
+
 const queryClient = new QueryClient();
-const App = () => (<QueryClientProvider client={queryClient}>
+
+function FullscreenLoader() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+    </div>
+  );
+}
+
+function ProtectedRoute({ children }) {
+  const auth = useAuth();
+
+  if (auth.loading) {
+    return <FullscreenLoader />;
+  }
+
+  if (!auth.isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+}
+
+function GuestOnlyRoute({ children }) {
+  const auth = useAuth();
+
+  if (auth.loading) {
+    return <FullscreenLoader />;
+  }
+
+  if (auth.isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
+function RoleRoute({ roles, children }) {
+  const auth = useAuth();
+
+  if (auth.loading) {
+    return <FullscreenLoader />;
+  }
+
+  if (!auth.isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!auth.hasRole(roles)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
+function RedirectToSsoProfile() {
+  const ssoPortalBaseUrl = String(import.meta.env.VITE_SSO_PORTAL_URL || 'http://localhost:9000').replace(/\/+$/, '');
+
+  useEffect(() => {
+    window.location.replace(`${ssoPortalBaseUrl}/#/profile`);
+  }, [ssoPortalBaseUrl]);
+
+  return <FullscreenLoader />;
+}
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <DataProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Dashboard />}/>
-            <Route path="/monitoring" element={<LiveMonitoring />}/>
-            <Route path="/vessels" element={<VesselList />}/>
-            <Route path="/vessels/:id" element={<VesselDetail />}/>
-            <Route path="/patrols" element={<PatrolList />}/>
-            <Route path="/patrols/:id" element={<PatrolDetail />}/>
-            <Route path="/crew" element={<CrewList />}/>
-            <Route path="/crew/:id" element={<CrewDetail />}/>
-            <Route path="/crew-assignments" element={<CrewAssignments />}/>
-            <Route path="/guard-posts" element={<GuardPostList />}/>
-            <Route path="/guard-posts/:areaId" element={<GuardPostAreaDetail />}/>
-            <Route path="/speedboats" element={<SpeedboatList />}/>
-            <Route path="/incidents" element={<IncidentList />}/>
-            <Route path="/incidents/new" element={<IncidentCreate />}/>
-            <Route path="/incidents/:id" element={<IncidentDetail />}/>
-            <Route path="/findings" element={<Findings />}/>
-            <Route path="/findings/:id" element={<FindingDetail />}/>
-            {/* <Route path="/monitoring-non-permanent" element={<NonPermanentResourceList />}/> */}
-            {/* <Route path="/monitoring-non-permanent/:id" element={<NonPermanentResourceDetail />}/> */}
-            {/* <Route path="/monitoring-permanent" element={<PermanentResourceList />}/> */}
-            {/* <Route path="/monitoring-permanent/:id" element={<PermanentResourceDetail />}/> */}
-            <Route path="/monitoring-megafauna" element={<MegafaunaObservationList />}/>
-            <Route path="/monitoring-megafauna/:id" element={<MegafaunaObservationDetail />}/>
-            <Route path="/monitoring-habitat" element={<HabitatMonitoringList />}/>
-            <Route path="/monitoring-habitat/:id" element={<HabitatMonitoringDetail />}/>
-            <Route path="/users" element={<UserManagementPage />}/>
-            <Route path="/profile" element={<ProfilePage />}/>
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />}/>
-          </Routes>
-        </BrowserRouter>
-      </DataProvider>
+      <AuthProvider>
+        <DataProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route
+                path="/login"
+                element={(
+                  <GuestOnlyRoute>
+                    <LoginPage />
+                  </GuestOnlyRoute>
+                )}
+              />
+              <Route path="/auth/callback" element={<AuthCallbackPage />} />
+
+              <Route
+                path="/"
+                element={(
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/monitoring"
+                element={(
+                  <ProtectedRoute>
+                    <LiveMonitoring />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/vessels"
+                element={(
+                  <ProtectedRoute>
+                    <VesselList />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/vessels/:id"
+                element={(
+                  <ProtectedRoute>
+                    <VesselDetail />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/patrols"
+                element={(
+                  <ProtectedRoute>
+                    <PatrolList />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/patrols/:id"
+                element={(
+                  <ProtectedRoute>
+                    <PatrolDetail />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/crew"
+                element={(
+                  <ProtectedRoute>
+                    <CrewList />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/crew/:id"
+                element={(
+                  <ProtectedRoute>
+                    <CrewDetail />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/crew-assignments"
+                element={(
+                  <ProtectedRoute>
+                    <CrewAssignments />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/guard-posts"
+                element={(
+                  <ProtectedRoute>
+                    <GuardPostList />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/guard-posts/:areaId"
+                element={(
+                  <ProtectedRoute>
+                    <GuardPostAreaDetail />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/speedboats"
+                element={(
+                  <ProtectedRoute>
+                    <SpeedboatList />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/incidents"
+                element={(
+                  <ProtectedRoute>
+                    <IncidentList />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/incidents/new"
+                element={(
+                  <ProtectedRoute>
+                    <IncidentCreate />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/incidents/:id"
+                element={(
+                  <ProtectedRoute>
+                    <IncidentDetail />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/findings"
+                element={(
+                  <ProtectedRoute>
+                    <Findings />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/findings/:id"
+                element={(
+                  <ProtectedRoute>
+                    <FindingDetail />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/monitoring-megafauna"
+                element={(
+                  <ProtectedRoute>
+                    <MegafaunaObservationList />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/monitoring-megafauna/:id"
+                element={(
+                  <ProtectedRoute>
+                    <MegafaunaObservationDetail />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/monitoring-habitat"
+                element={(
+                  <ProtectedRoute>
+                    <HabitatMonitoringList />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/monitoring-habitat/:id"
+                element={(
+                  <ProtectedRoute>
+                    <HabitatMonitoringDetail />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/users"
+                element={(
+                  <RoleRoute roles={['superadmin', 'admin']}>
+                    <UserManagementPage />
+                  </RoleRoute>
+                )}
+              />
+              <Route
+                path="/profile"
+                element={(
+                  <ProtectedRoute>
+                    <RedirectToSsoProfile />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </DataProvider>
+      </AuthProvider>
     </TooltipProvider>
-  </QueryClientProvider>);
+  </QueryClientProvider>
+);
+
 export default App;

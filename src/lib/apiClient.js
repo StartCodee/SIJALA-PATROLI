@@ -1,4 +1,6 @@
-const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4100';
+import { clearAuthSession, getAuthSession, setAuthSession } from '@/lib/authStorage';
+
+const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4200';
 
 function normalizeBaseUrl(baseUrl) {
   return String(baseUrl || '').trim().replace(/\/+$/, '');
@@ -9,6 +11,11 @@ const API_BASE_URL = normalizedBase.endsWith('/api')
   ? normalizedBase
   : `${normalizedBase}/api`;
 
+let refreshPromise = null;
+const COOKIE_AUTH_HEADERS = {
+  'X-Auth-Mode': 'cookie',
+};
+
 function extractErrorMessage(body, statusCode) {
   return (
     (body && typeof body === 'object' && body.message) ||
@@ -16,32 +23,9 @@ function extractErrorMessage(body, statusCode) {
   );
 }
 
-async function request(path, options = {}) {
-  const hasFormDataBody = options.body instanceof FormData;
-  const baseHeaders = hasFormDataBody ? {} : { 'Content-Type': 'application/json' };
-
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      ...baseHeaders,
-      ...(options.headers || {}),
-    },
-  });
-
-  if (response.status === 204) {
-    return null;
-  }
-
-  const contentType = response.headers.get('content-type') || '';
-  const body = contentType.includes('application/json')
-    ? await response.json()
-    : await response.text();
-
-  if (!response.ok) {
-    throw new Error(extractErrorMessage(body, response.status));
-  }
-
-  return body;
+function networkError(message, cause) {
+  const detail = cause instanceof Error ? cause.message : '';
+  return new Error(detail ? `${message} (${detail})` : message);
 }
 
 function toRequestBody(payload) {
@@ -61,7 +45,277 @@ function toQuery(params = {}) {
   return queryString ? `?${queryString}` : '';
 }
 
+function persistSession(authPayload) {
+  if (!authPayload || typeof authPayload !== 'object') {
+    throw new Error('Session auth tidak valid.');
+  }
+
+  const session = {
+    accessToken: authPayload.accessToken,
+    user: authPayload.user || null,
+    expiresIn: authPayload.expiresIn || 0,
+  };
+
+  if (!session.accessToken) {
+    throw new Error('Access token autentikasi tidak tersedia.');
+  }
+
+  setAuthSession(session);
+  return session;
+}
+
+async function parseResponse(response) {
+  if (response.status === 204) {
+    return null;
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  const body = contentType.includes('application/json')
+    ? await response.json()
+    : await response.text();
+
+  if (!response.ok) {
+    throw new Error(extractErrorMessage(body, response.status));
+  }
+
+  return body;
+}
+
+async function refreshAccessToken() {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    let response;
+    try {
+      response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...COOKIE_AUTH_HEADERS,
+        },
+        credentials: 'include',
+      });
+    } catch (error) {
+      throw networkError(
+        `Tidak dapat terhubung ke API untuk refresh sesi: ${API_BASE_URL}`,
+        error,
+      );
+    }
+
+    const parsed = await parseResponse(response);
+    return persistSession(parsed);
+  })();
+
+  try {
+    return await refreshPromise;
+  } catch (error) {
+    clearAuthSession();
+    throw error;
+  } finally {
+    refreshPromise = null;
+  }
+}
+
+async function request(path, options = {}) {
+  const {
+    auth = true,
+    retryOnAuthError = true,
+    ...fetchOptions
+  } = options;
+
+  const hasFormDataBody = fetchOptions.body instanceof FormData;
+  const baseHeaders = hasFormDataBody ? {} : { 'Content-Type': 'application/json' };
+
+  const session = getAuthSession();
+  const accessToken = session?.accessToken;
+
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...fetchOptions,
+      headers: {
+        ...baseHeaders,
+        ...(auth && accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        ...(fetchOptions.headers || {}),
+      },
+      credentials: 'include',
+    });
+  } catch (error) {
+    throw networkError(
+      `Tidak dapat terhubung ke API (${API_BASE_URL}). Pastikan backend aktif.`,
+      error,
+    );
+  }
+
+  if (response.status === 401 && auth && retryOnAuthError) {
+    await refreshAccessToken();
+    return request(path, {
+      ...options,
+      retryOnAuthError: false,
+    });
+  }
+
+  return parseResponse(response);
+}
+
 export const apiClient = {
+  getStoredSession() {
+    return getAuthSession();
+  },
+
+  clearSession() {
+    clearAuthSession();
+  },
+
+  async login({ usernameOrEmail, password }) {
+    const payload = await request('/auth/login', {
+      method: 'POST',
+      auth: false,
+      headers: {
+        ...COOKIE_AUTH_HEADERS,
+      },
+      body: JSON.stringify({
+        usernameOrEmail,
+        password,
+      }),
+    });
+    persistSession(payload);
+    return payload;
+  },
+
+  async exchangeSsoCode({ code, state }) {
+    const payload = await request('/auth/sso/exchange', {
+      method: 'POST',
+      auth: false,
+      headers: {
+        ...COOKIE_AUTH_HEADERS,
+      },
+      body: JSON.stringify({ code, state }),
+    });
+    persistSession(payload);
+    return payload;
+  },
+
+  getSsoLoginUrl() {
+    return request('/auth/sso/login-url', {
+      auth: false,
+    });
+  },
+
+  getSsoLogoutUrl() {
+    return request('/auth/sso/logout-url', {
+      auth: false,
+    });
+  },
+
+  async prepareSsoAuthorizeUrl() {
+    // Mulai login SSO sebagai sesi baru untuk mencegah state lama membingungkan.
+    try {
+      await request('/auth/logout', {
+        method: 'POST',
+        auth: false,
+        headers: {
+          ...COOKIE_AUTH_HEADERS,
+        },
+      });
+    } catch {
+      // Best effort: tetap lanjutkan flow SSO.
+    } finally {
+      clearAuthSession();
+    }
+
+    const payload = await request('/auth/sso/login-url', {
+      auth: false,
+    });
+
+    const authorizeUrl = String(payload?.authorizeUrl || '').trim();
+    if (!authorizeUrl) {
+      throw new Error('URL login SSO tidak tersedia.');
+    }
+
+    return authorizeUrl;
+  },
+
+  async logout(options = {}) {
+    const {
+      global = true,
+      redirect = true,
+    } = options;
+    let logoutUrl = null;
+
+    if (global) {
+      try {
+        const payload = await request('/auth/sso/logout-url', {
+          auth: false,
+        });
+        const candidate = String(payload?.logoutUrl || '').trim();
+        if (candidate) {
+          logoutUrl = candidate;
+        }
+      } catch {
+        // Best effort: tetap lanjut logout lokal app.
+      }
+    }
+
+    try {
+      await request('/auth/logout', {
+        method: 'POST',
+        auth: false,
+        headers: {
+          ...COOKIE_AUTH_HEADERS,
+        },
+      });
+    } finally {
+      clearAuthSession();
+    }
+
+    if (global && redirect && logoutUrl) {
+      window.location.assign(logoutUrl);
+    }
+
+    return {
+      logoutUrl,
+    };
+  },
+
+  async restoreSessionFromCookie() {
+    try {
+      await refreshAccessToken();
+      return true;
+    } catch {
+      clearAuthSession();
+      return false;
+    }
+  },
+
+  getMe() {
+    return request('/auth/me');
+  },
+
+  updateMyProfile(payload) {
+    return request('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  uploadMyProfilePhoto(file) {
+    const formData = new FormData();
+    formData.append('photo', file);
+    return request('/auth/profile/photo', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  deleteMyProfilePhoto() {
+    return request('/auth/profile/photo', {
+      method: 'DELETE',
+    });
+  },
+
   getHealth() {
     return request('/health');
   },
