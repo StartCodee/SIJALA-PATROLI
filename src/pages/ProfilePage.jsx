@@ -24,7 +24,7 @@ function initialsOf(name) {
 const ProfilePage = () => {
   const auth = useAuth();
   const { toast } = useToast();
-  const ssoPortalUrl = import.meta.env.VITE_SSO_PORTAL_URL || 'http://localhost:9000';
+  const ssoPortalUrl = import.meta.env.VITE_SSO_PORTAL_URL || '/sso';
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');

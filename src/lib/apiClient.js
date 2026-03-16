@@ -5,46 +5,14 @@ import {
   setAuthSession,
 } from '@/lib/authStorage';
 
-const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4200';
-const RAW_SSO_PORTAL_URL = import.meta.env.VITE_SSO_PORTAL_URL || 'http://localhost:9000';
-
-
-
-async function ssoRequest(path, options = {}) {
-  const hasFormDataBody = options.body instanceof FormData;
-  const baseHeaders = hasFormDataBody ? {} : { 'Content-Type': 'application/json' };
-
-  let response;
-  try {
-    response = await fetch(`${SSO_API_BASE_URL}${path}`, {
-      ...options,
-      headers: {
-        ...baseHeaders,
-        ...(options.headers || {}),
-      },
-      credentials: 'include',
-    });
-  } catch (error) {
-    throw networkError(
-      `Tidak dapat terhubung ke SSO Portal (${SSO_API_BASE_URL}).`,
-      error,
-    );
-  }
-
-  return parseResponse(response);
-}
-
-
-
+const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const RAW_SSO_PORTAL_URL = import.meta.env.VITE_SSO_PORTAL_URL || '/sso';
 
 function normalizeBaseUrl(baseUrl) {
   return String(baseUrl || '').trim().replace(/\/+$/, '');
 }
 
 export const SSO_PORTAL_URL = normalizeBaseUrl(RAW_SSO_PORTAL_URL);
-
-const SSO_API_BASE_URL = `${SSO_PORTAL_URL}/api`;
-
 
 const normalizedBase = normalizeBaseUrl(RAW_API_BASE_URL);
 const API_BASE_URL = normalizedBase.endsWith('/api')
@@ -248,84 +216,86 @@ export const apiClient = {
   },
 
   getSsoLoginUrl() {
-    return ssoRequest('/auth/sso/login-url', {
+    return request('/auth/sso/login-url', {
       auth: false,
     });
   },
 
   getSsoLogoutUrl() {
-    return ssoRequest('/auth/sso/logout-url', {
+    return request('/auth/sso/logout-url', {
       auth: false,
     });
   },
 
- async prepareSsoAuthorizeUrl() {
-  // logout lokal app dulu, bukan SSO
-  try {
-    await request('/auth/logout', {
-      method: 'POST',
-      auth: false,
-      headers: {
-        ...COOKIE_AUTH_HEADERS,
-      },
-    });
-  } catch {
-    // best effort
-  } finally {
-    clearAuthSession();
-  }
-
-  const payload = await ssoRequest('/auth/login-url');
-
-  const authorizeUrl = String(payload?.authorizeUrl || '').trim();
-  if (!authorizeUrl) {
-    throw new Error('URL login SSO tidak tersedia.');
-  }
-
-  return authorizeUrl;
-},
-
-
-
- async logout(options = {}) {
-  const {
-    global = true,
-    redirect = true,
-  } = options;
-
-  let logoutUrl = null;
-
-  if (global) {
+  async prepareSsoAuthorizeUrl() {
+    // Mulai login SSO sebagai sesi baru untuk mencegah state lama membingungkan.
     try {
-      const payload = await ssoRequest('/auth/logout-url');
-      const candidate = String(payload?.logoutUrl || '').trim();
-      if (candidate) {
-        logoutUrl = candidate;
-      }
+      await request('/auth/logout', {
+        method: 'POST',
+        auth: false,
+        headers: {
+          ...COOKIE_AUTH_HEADERS,
+        },
+      });
     } catch {
-      // best effort
+      // Best effort: tetap lanjutkan flow SSO.
+    } finally {
+      clearAuthSession();
     }
-  }
 
-  // logout lokal app API
-  try {
-    await request('/auth/logout', {
-      method: 'POST',
+    const payload = await request('/auth/sso/login-url', {
       auth: false,
-      headers: {
-        ...COOKIE_AUTH_HEADERS,
-      },
     });
-  } finally {
-    clearAuthSession();
-  }
 
-  if (global && redirect && logoutUrl) {
-    window.location.assign(logoutUrl);
-  }
+    const authorizeUrl = String(payload?.authorizeUrl || '').trim();
+    if (!authorizeUrl) {
+      throw new Error('URL login SSO tidak tersedia.');
+    }
 
-  return { logoutUrl };
-},
+    return authorizeUrl;
+  },
+
+  async logout(options = {}) {
+    const {
+      global = true,
+      redirect = true,
+    } = options;
+    let logoutUrl = null;
+
+    if (global) {
+      try {
+        const payload = await request('/auth/sso/logout-url', {
+          auth: false,
+        });
+        const candidate = String(payload?.logoutUrl || '').trim();
+        if (candidate) {
+          logoutUrl = candidate;
+        }
+      } catch {
+        // Best effort: tetap lanjut logout lokal app.
+      }
+    }
+
+    try {
+      await request('/auth/logout', {
+        method: 'POST',
+        auth: false,
+        headers: {
+          ...COOKIE_AUTH_HEADERS,
+        },
+      });
+    } finally {
+      clearAuthSession();
+    }
+
+    if (global && redirect && logoutUrl) {
+      window.location.assign(logoutUrl);
+    }
+
+    return {
+      logoutUrl,
+    };
+  },
 
   async hasActiveSsoPortalSession() {
     try {

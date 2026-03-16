@@ -177,8 +177,8 @@ const FindingDetail = () => {
             <CardContent className="space-y-2 text-sm">
               <p>Nama Kapal: {finding.vesselName}</p>
               <p>Nahkoda: {finding.captainName}</p>
-              <p>Jenis Kapal: {finding.shipKind}</p>
-              <p>Kategori Kapal: {finding.shipCategory}</p>
+              <p>Jenis Kapal: {formatWithOther(finding.shipKind, finding.shipKindOther)}</p>
+              <p>Kategori Kapal: {formatWithOther(finding.shipCategory, finding.shipCategoryOther)}</p>
               <p>Asal Kapal: {finding.shipOrigin}</p>
               <p>Tipe Mesin: {finding.engineType}</p>
               <p>Daya Mesin: {finding.enginePower}</p>
@@ -206,12 +206,18 @@ const FindingDetail = () => {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Alat Tangkap</p>
-                <p>{finding.fishingTools.length > 0 ? finding.fishingTools.join(', ') : '-'}</p>
+                <p>{formatWithOther(finding.fishingTools.length > 0 ? finding.fishingTools.join(', ') : '-', finding.fishingToolsOther)}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Tindakan</p>
                 <p>{finding.actionTaken}</p>
               </div>
+              {finding.notes ? (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Catatan Lapangan</p>
+                  <p>{finding.notes}</p>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -224,16 +230,6 @@ const FindingDetail = () => {
             </CardContent>
           </Card>
 
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="text-base font-semibold">Data Mentah Temuan (Lengkap)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <pre className="max-h-[320px] overflow-auto rounded-md bg-muted p-3 text-xs">
-                {JSON.stringify(finding.rawFinding, null, 2)}
-              </pre>
-            </CardContent>
-          </Card>
         </div>
 
         <div className="space-y-6">
@@ -281,3 +277,14 @@ const FindingDetail = () => {
 };
 
 export default FindingDetail;
+
+const formatWithOther = (value, otherValue) => {
+  const normalizedValue = `${value || ''}`.trim();
+  const normalizedOther = `${otherValue || ''}`.trim();
+  if (normalizedOther) {
+    return normalizedValue && normalizedValue !== '-'
+      ? `${normalizedValue} (${normalizedOther})`
+      : normalizedOther;
+  }
+  return normalizedValue || '-';
+};

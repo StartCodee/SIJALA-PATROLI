@@ -13,29 +13,12 @@ import {
   reviewClassMap,
   reviewLabelMap,
 } from '@/lib/apiClient';
+import {
+  formatCoordinate,
+  normalizeResourceUseReport,
+} from '@/lib/reportPresentation';
 import { AttachmentList } from '@/components/reports/AttachmentList';
 import { SignaturePreview } from '@/components/reports/SignaturePreview';
-
-function normalizeTeamOthers(raw) {
-  const list = Array.isArray(raw) ? raw : [];
-  const seen = new Set();
-  const out = [];
-  for (const item of list) {
-    const isObject = item && typeof item === 'object' && !Array.isArray(item);
-    const name = `${isObject ? item.name : item || ''}`.trim();
-    if (!name) continue;
-    const role = `${isObject ? item.role || 'Lainnya' : 'Lainnya'}`.trim() || 'Lainnya';
-    const key = `${role.toLowerCase()}|${name.toLowerCase()}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({
-      name,
-      role,
-      signature: isObject ? item.signature : null,
-    });
-  }
-  return out;
-}
 
 const MegafaunaObservationDetail = () => {
   const { id } = useParams();
@@ -68,56 +51,9 @@ const MegafaunaObservationDetail = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const payload = report?.payload || {};
-  const fixedEntries = Array.isArray(payload.fixedResources) && payload.fixedResources.length > 0
-    ? payload.fixedResources.filter((item) => item && typeof item === 'object')
-    : (payload.fixedResource && typeof payload.fixedResource === 'object' ? [payload.fixedResource] : []);
-  const nonFixedEntries = Array.isArray(payload.nonFixedResources) && payload.nonFixedResources.length > 0
-    ? payload.nonFixedResources.filter((item) => item && typeof item === 'object')
-    : (payload.nonFixedResource && typeof payload.nonFixedResource === 'object' ? [payload.nonFixedResource] : []);
-  const megafaunaEntries = Array.isArray(payload.megafaunaEntries) && payload.megafaunaEntries.length > 0
-    ? payload.megafaunaEntries.filter((item) => item && typeof item === 'object')
-    : (payload.megafauna && typeof payload.megafauna === 'object' ? [payload.megafauna] : []);
-
-  const fixed = fixedEntries[0] || {};
-  const nonFixed = nonFixedEntries[0] || {};
-  const megafauna = megafaunaEntries[0] || {};
-  const teamSnapshot = payload.teamSnapshot && typeof payload.teamSnapshot === 'object' ? payload.teamSnapshot : {};
-  const teamRoles = Array.isArray(teamSnapshot.roles) ? teamSnapshot.roles : [];
-  const teamOthers = normalizeTeamOthers(teamSnapshot.others);
-  const teamPhotos = Array.isArray(teamSnapshot.photoUrls) ? teamSnapshot.photoUrls : [];
-
-  const mapMarkers = useMemo(() => {
-    const markers = [];
-
-    if (Number.isFinite(fixed?.location?.lat) && Number.isFinite(fixed?.location?.lon)) {
-      markers.push({
-        lat: Number(fixed.location.lat),
-        lon: Number(fixed.location.lon),
-        label: 'Sumber Daya Tetap',
-        description: fixed.type || '-',
-        color: '#22c55e',
-        iconSymbol: '🪸',
-        iconColor: '#16a34a',
-      });
-    }
-
-    if (Number.isFinite(megafauna?.location?.lat) && Number.isFinite(megafauna?.location?.lon)) {
-      markers.push({
-        lat: Number(megafauna.location.lat),
-        lon: Number(megafauna.location.lon),
-        label: 'Megafauna',
-        description: megafauna.species || '-',
-        color: '#3b82f6',
-        iconSymbol: '🐋',
-        iconColor: '#2563eb',
-      });
-    }
-
-    return markers;
-  }, [fixed, megafauna]);
-
-  const selectedPoint = mapMarkers[0] || null;
+  const detail = useMemo(() => normalizeResourceUseReport(report), [report]);
+  const { fixedEntries, nonFixedEntries, megafaunaEntries, teamSnapshot, markers, summary } = detail;
+  const selectedPoint = markers[0] || null;
 
   if (loading && !report) {
     return (
@@ -158,8 +94,8 @@ const MegafaunaObservationDetail = () => {
 
       <div className="flex flex-wrap items-center gap-2 mb-5">
         <Badge className={`border ${reviewClassMap[report.status]}`}>{reviewLabelMap[report.status]}</Badge>
-        <Badge variant="outline">Area: {report.areaName || '-'}</Badge>
-        <Badge variant="outline">Pos: {report.postName || '-'}</Badge>
+        <Badge variant="outline">Area: {detail.areaName}</Badge>
+        <Badge variant="outline">Pos: {detail.postName}</Badge>
         <Badge variant="outline">Dikirim: {formatDateTime(report.submittedAt)}</Badge>
       </div>
 
@@ -172,71 +108,92 @@ const MegafaunaObservationDetail = () => {
                   <Fish className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex-1">
-              <h2 className="text-xl font-bold mb-1">{megafauna.species || 'Megafauna'}</h2>
-              <p className="text-sm text-muted-foreground mb-3">
-                    Jumlah: {megafauna.count ?? 0} | Lokasi: {megafauna.placeName || '-'}
-              </p>
+                  <h2 className="text-xl font-bold mb-1">Monitoring Pemanfaatan</h2>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {report.submittedBy || '-'} · {detail.postName}
+                  </p>
                   <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline">Submitted By: {report.submittedBy || '-'}</Badge>
-                    <Badge variant="secondary">Status: {reviewLabelMap[report.status]}</Badge>
+                    <Badge variant="outline">Tetap: {fixedEntries.length}</Badge>
+                    <Badge variant="outline">Tidak Tetap: {nonFixedEntries.length}</Badge>
+                    <Badge variant="secondary">Megafauna: {megafaunaEntries.length}</Badge>
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <MapCard
-            title="Lokasi Laporan RUM"
-            selectedVessel={
-              selectedPoint
-                ? {
-                    name: selectedPoint.label,
-                    lat: selectedPoint.lat,
-                    lon: selectedPoint.lon,
-                  }
-                : null
-            }
-            markers={mapMarkers}
-            showControls={false}
-            showSelectedMarker={false}
-          >
-            {mapMarkers.length > 0 && (
-              <div className="absolute top-4 left-4 z-[1000] rounded-lg border border-border bg-card/95 px-3 py-2 text-xs shadow-card backdrop-blur-sm">
-                <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <span>🪸</span>
-                    <span>Sumber Daya Tetap</span>
-                  </span>
-                  <span className="text-slate-300">·</span>
-                  <span className="inline-flex items-center gap-1">
-                    <span>🐋</span>
-                    <span>Megafauna</span>
-                  </span>
+          {selectedPoint ? (
+            <MapCard
+              title="Lokasi Laporan RUM"
+              selectedVessel={{
+                name: selectedPoint.label,
+                lat: selectedPoint.lat,
+                lon: selectedPoint.lon,
+              }}
+              markers={markers}
+              showControls={false}
+              showSelectedMarker={false}
+            >
+              {markers.length > 0 && (
+                <div className="absolute top-4 left-4 z-[1000] rounded-lg border border-border bg-card/95 px-3 py-2 text-xs shadow-card backdrop-blur-sm">
+                  <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      <span>🪸</span>
+                      <span>Tetap</span>
+                    </span>
+                    <span className="text-slate-300">·</span>
+                    <span className="inline-flex items-center gap-1">
+                      <span>🎣</span>
+                      <span>Tidak Tetap</span>
+                    </span>
+                    <span className="text-slate-300">·</span>
+                    <span className="inline-flex items-center gap-1">
+                      <span>🐋</span>
+                      <span>Megafauna</span>
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
-          </MapCard>
+              )}
+            </MapCard>
+          ) : (
+            <Card className="shadow-card">
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                Belum ada titik koordinat yang bisa ditampilkan pada peta.
+              </CardContent>
+            </Card>
+          )}
 
           <Card className="shadow-card">
             <CardHeader>
               <CardTitle className="text-base font-semibold">Sumber Daya Tetap ({fixedEntries.length})</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p>GPS: {fixed.gpsNumber || '-'}</p>
-              <p>Jenis: {fixed.type || '-'}</p>
-              <p>Nama Obyek: {fixed.objectName || '-'}</p>
-              <p>Fungsi/Kegunaan: {fixed.functionUse || '-'}</p>
-              <p>Status Digunakan: {fixed.inUse ? 'Ya' : 'Tidak'}</p>
-              <p>Jumlah Unit: {fixed.unitCount ?? 0}</p>
-              <p>
-                Koordinat: {Number.isFinite(fixed?.location?.lat) && Number.isFinite(fixed?.location?.lon)
-                  ? `${Number(fixed.location.lat).toFixed(6)}, ${Number(fixed.location.lon).toFixed(6)}`
-                  : '-'}
-              </p>
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Foto Sumber Daya Tetap</p>
-                <AttachmentList items={fixed.photoUrls || []} emptyLabel="Tidak ada foto sumber daya tetap." />
-              </div>
+            <CardContent className="space-y-4">
+              {fixedEntries.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Tidak ada entri sumber daya tetap.</p>
+              ) : (
+                fixedEntries.map((entry) => (
+                  <div key={entry.id} className="rounded-lg border border-border p-4 space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary">Entri #{entry.order}</Badge>
+                      <Badge variant={entry.inUse ? 'outline' : 'destructive'}>
+                        {entry.inUse ? 'Sedang Digunakan' : 'Tidak Digunakan'}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <DetailField label="GPS" value={entry.gpsNumber} />
+                      <DetailField label="Jenis" value={formatWithOther(entry.type, entry.typeOther)} />
+                      <DetailField label="Nama Obyek" value={entry.objectName} />
+                      <DetailField label="Jumlah Unit" value={entry.unitCount} />
+                      <DetailField label="Fungsi/Kegunaan" value={entry.functionUse} fullWidth />
+                      <DetailField label="Koordinat" value={formatCoordinate(entry.location)} fullWidth />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-2">Foto Sumber Daya Tetap</p>
+                      <AttachmentList items={entry.photoUrls} emptyLabel="Tidak ada foto sumber daya tetap." />
+                    </div>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
 
@@ -244,15 +201,73 @@ const MegafaunaObservationDetail = () => {
             <CardHeader>
               <CardTitle className="text-base font-semibold">Sumber Daya Tidak Tetap ({nonFixedEntries.length})</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <p>GPS: {nonFixed.gpsNumber || '-'}</p>
-              <p>Pemanfaat: {nonFixed.userType || '-'}</p>
-              <p>Aktivitas: {nonFixed.activity || '-'}</p>
-              <p>Wawancara: {nonFixed.interviewed ? 'Ya' : 'Tidak'}</p>
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Foto Wawancara</p>
-                <AttachmentList items={nonFixed.photoUrls || []} emptyLabel="Tidak ada foto wawancara." />
-              </div>
+            <CardContent className="space-y-4">
+              {nonFixedEntries.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Tidak ada entri sumber daya tidak tetap.</p>
+              ) : (
+                nonFixedEntries.map((entry) => (
+                  <div key={entry.id} className="rounded-lg border border-border p-4 space-y-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary">Entri #{entry.order}</Badge>
+                      <Badge variant="outline">{entry.userType}</Badge>
+                      <Badge variant={entry.hasCatch ? 'secondary' : 'outline'}>
+                        {entry.hasCatch ? 'Ada Hasil Tangkapan' : 'Tanpa Tangkapan'}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <DetailField label="GPS" value={entry.gpsNumber} />
+                      <DetailField label="Pemanfaat" value={entry.userType} />
+                      <DetailField label="Aktivitas" value={formatWithOther(entry.activity, entry.activityOther)} />
+                      <DetailField label="Asal" value={entry.origin} />
+                      <DetailField label="Wawancara" value={entry.interviewed ? 'Ya' : 'Tidak'} />
+                      <DetailField label="Koordinat" value={formatCoordinate(entry.location)} />
+                      <DetailField label="Catatan Wawancara" value={entry.interviewNote} fullWidth />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">Foto Wawancara</p>
+                        <AttachmentList
+                          items={entry.interviewPhotoUrls}
+                          emptyLabel="Tidak ada foto wawancara."
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">Foto Umum</p>
+                        <AttachmentList items={entry.photoUrls} emptyLabel="Tidak ada foto umum." />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <p className="text-xs text-muted-foreground">Hasil Tangkapan</p>
+                      {entry.catches.length > 0 ? (
+                        entry.catches.map((catchItem) => (
+                          <div key={`${entry.id}-${catchItem.id}`} className="rounded-lg border border-border bg-muted/20 p-3 space-y-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <DetailField label="Hasil Tangkapan" value={catchItem.catchName} />
+                              <DetailField label="Jumlah (Ekor)" value={catchItem.count} />
+                              <DetailField label="Panjang (Cm)" value={catchItem.lengthCm} />
+                              <DetailField label="Berat Basah (Kg)" value={catchItem.wetWeightKg} />
+                              <DetailField label="Berat Kering (Kg)" value={catchItem.dryWeightKg} />
+                              <DetailField label="Lama Kerja (Jam)" value={catchItem.workDurationHours} />
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-2">Foto Hasil Tangkapan</p>
+                              <AttachmentList
+                                items={catchItem.photoUrls}
+                                emptyLabel="Tidak ada foto hasil tangkapan."
+                              />
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Tidak ada detail hasil tangkapan.</p>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
 
@@ -260,20 +275,30 @@ const MegafaunaObservationDetail = () => {
             <CardHeader>
               <CardTitle className="text-base font-semibold">Pemantauan Megafauna ({megafaunaEntries.length})</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <p>GPS: {megafauna.gpsNumber || '-'}</p>
-              <p>Nama Tempat: {megafauna.placeName || '-'}</p>
-              <p>Spesies: {megafauna.species || '-'}</p>
-              <p>Jumlah: {megafauna.count ?? 0}</p>
-              <p>
-                Koordinat: {Number.isFinite(megafauna?.location?.lat) && Number.isFinite(megafauna?.location?.lon)
-                  ? `${Number(megafauna.location.lat).toFixed(6)}, ${Number(megafauna.location.lon).toFixed(6)}`
-                  : '-'}
-              </p>
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Foto Megafauna</p>
-                <AttachmentList items={megafauna.photoUrls || []} emptyLabel="Tidak ada foto megafauna." />
-              </div>
+            <CardContent className="space-y-4">
+              {megafaunaEntries.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Tidak ada entri megafauna.</p>
+              ) : (
+                megafaunaEntries.map((entry) => (
+                  <div key={entry.id} className="rounded-lg border border-border p-4 space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary">Entri #{entry.order}</Badge>
+                      <Badge variant="outline">{entry.species}</Badge>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <DetailField label="GPS" value={entry.gpsNumber} />
+                      <DetailField label="Nama Tempat" value={entry.placeName} />
+                      <DetailField label="Spesies" value={formatWithOther(entry.species, entry.speciesOther || entry.speciesName)} />
+                      <DetailField label="Jumlah" value={entry.count} />
+                      <DetailField label="Koordinat" value={formatCoordinate(entry.location)} fullWidth />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-2">Foto Megafauna</p>
+                      <AttachmentList items={entry.photoUrls} emptyLabel="Tidak ada foto megafauna." />
+                    </div>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
 
@@ -284,63 +309,34 @@ const MegafaunaObservationDetail = () => {
                 Snapshot Tim Lapangan
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {teamRoles.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Tidak ada snapshot tim pada laporan ini.</p>
-              ) : (
-                <div className="space-y-2">
-                  {teamRoles.map((entry, index) => (
-                    <div key={`team-role-${index}`} className="rounded-lg border border-border p-3 text-sm">
-                      <p>
-                        <span className="text-muted-foreground">Peran:</span> {entry.role || '-'}
-                      </p>
-                      <p>
-                        <span className="text-muted-foreground">Nama:</span> {entry.name || '-'}
-                      </p>
-                      <div className="mt-2">
-                        <p className="text-xs text-muted-foreground mb-1">Tanda tangan</p>
-                        <SignaturePreview signature={entry.signature} />
-                      </div>
-                    </div>
+            <CardContent className="space-y-4">
+              {(teamSnapshot.roles || []).length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {teamSnapshot.roles.map((member, index) => (
+                    <TeamMemberCard key={`team-role-${index}`} member={member} />
                   ))}
                 </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Tidak ada snapshot tim inti pada laporan ini.</p>
               )}
+
               <div className="space-y-2">
-                <p className="text-xs text-muted-foreground mb-1">Anggota lainnya</p>
-                {teamOthers.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">-</p>
+                <p className="text-xs text-muted-foreground">Anggota lainnya</p>
+                {(teamSnapshot.others || []).length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {teamSnapshot.others.map((member, index) => (
+                      <TeamMemberCard key={`team-other-${index}`} member={member} />
+                    ))}
+                  </div>
                 ) : (
-                  teamOthers.map((entry, index) => (
-                    <div key={`team-other-${index}`} className="rounded-lg border border-border p-3 text-sm">
-                      <p>
-                        <span className="text-muted-foreground">Peran:</span> {entry.role || 'Lainnya'}
-                      </p>
-                      <p>
-                        <span className="text-muted-foreground">Nama:</span> {entry.name || '-'}
-                      </p>
-                      <div className="mt-2">
-                        <p className="text-xs text-muted-foreground mb-1">Tanda tangan</p>
-                        <SignaturePreview signature={entry.signature} />
-                      </div>
-                    </div>
-                  ))
+                  <p className="text-sm text-muted-foreground">Tidak ada anggota tambahan.</p>
                 )}
               </div>
+
               <div>
                 <p className="text-xs text-muted-foreground mb-2">Swafoto Tim</p>
-                <AttachmentList items={teamPhotos} emptyLabel="Tidak ada swafoto tim." />
+                <AttachmentList items={teamSnapshot.photoUrls} emptyLabel="Tidak ada swafoto tim." />
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="text-base font-semibold">Payload Form Lengkap (Raw)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <pre className="max-h-[320px] overflow-auto rounded-md bg-muted p-3 text-xs">
-                {JSON.stringify(payload, null, 2)}
-              </pre>
             </CardContent>
           </Card>
         </div>
@@ -368,10 +364,66 @@ const MegafaunaObservationDetail = () => {
               </div>
             </CardContent>
           </Card>
+
+          <Card className="shadow-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">Ringkasan RUM</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>
+                Sumber Daya Tetap: <span className="text-foreground">{summary.fixedEntryCount ?? fixedEntries.length}</span>
+              </p>
+              <p>
+                Sumber Daya Tidak Tetap: <span className="text-foreground">{summary.nonFixedEntryCount ?? nonFixedEntries.length}</span>
+              </p>
+              <p>
+                Data Tangkapan: <span className="text-foreground">{summary.nonFixedCatchCount ?? 0}</span>
+              </p>
+              <p>
+                Megafauna: <span className="text-foreground">{summary.megafaunaEntryCount ?? megafaunaEntries.length}</span>
+              </p>
+              <p>
+                Spesies Unik: <span className="text-foreground">{summary.megafaunaUniqueSpeciesCount ?? 0}</span>
+              </p>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </MainLayout>
   );
+};
+
+const DetailField = ({ label, value, fullWidth = false }) => (
+  <div className={fullWidth ? 'md:col-span-2 rounded-lg border border-border bg-card px-3 py-2' : 'rounded-lg border border-border bg-card px-3 py-2'}>
+    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+    <p className="mt-1 text-sm font-medium text-foreground whitespace-pre-wrap">{`${value ?? '-'}` || '-'}</p>
+  </div>
+);
+
+const TeamMemberCard = ({ member }) => (
+  <div className="rounded-lg border border-border p-3 text-sm">
+    <p>
+      <span className="text-muted-foreground">Peran:</span> {member.role || '-'}
+    </p>
+    <p>
+      <span className="text-muted-foreground">Nama:</span> {member.name || '-'}
+    </p>
+    <div className="mt-2">
+      <p className="text-xs text-muted-foreground mb-1">Tanda tangan</p>
+      <SignaturePreview signature={member.signature} />
+    </div>
+  </div>
+);
+
+const formatWithOther = (value, otherValue) => {
+  const normalizedValue = `${value || ''}`.trim();
+  const normalizedOther = `${otherValue || ''}`.trim();
+  if (normalizedOther) {
+    return normalizedValue && normalizedValue !== '-'
+      ? `${normalizedValue} (${normalizedOther})`
+      : normalizedOther;
+  }
+  return normalizedValue || '-';
 };
 
 export default MegafaunaObservationDetail;

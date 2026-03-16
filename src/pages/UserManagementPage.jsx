@@ -26,7 +26,7 @@ const roleRows = [
 
 const UserManagementPage = () => {
   const auth = useAuth();
-  const ssoPortalUrl = import.meta.env.VITE_SSO_PORTAL_URL || 'http://localhost:9000';
+  const ssoPortalUrl = import.meta.env.VITE_SSO_PORTAL_URL || '/sso';
 
   return (
     <MainLayout

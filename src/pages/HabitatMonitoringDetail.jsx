@@ -13,51 +13,9 @@ import {
   reviewClassMap,
   reviewLabelMap,
 } from '@/lib/apiClient';
+import { normalizeHabitatReport } from '@/lib/reportPresentation';
 import { SignaturePreview } from '@/components/reports/SignaturePreview';
 import { AttachmentList } from '@/components/reports/AttachmentList';
-
-const DEFAULT_LOCATION_POINT = { lat: -0.5508, lon: 130.5737 };
-
-const locationMap = {
-  'manta sandy': { lat: -0.5639, lon: 130.6636 },
-  'manta ridge': { lat: -0.5704, lon: 130.6542 },
-  'pos dayan/batanta': { lat: -0.4436, lon: 130.5656 },
-  'pos andau/fam': { lat: -0.2679, lon: 130.0627 },
-  membarayup: { lat: -0.7239, lon: 130.5962 },
-  'irwor inbekya': { lat: -0.6118, lon: 130.7055 },
-  // Backward compatibility with older datasets
-  'arborek jetty': { lat: -0.5448, lon: 130.5316 },
-  'blue magic': { lat: -0.5017, lon: 130.6614 },
-  'cape kri': { lat: -0.5632, lon: 130.6008 },
-};
-
-function normalizeLocationKey(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ');
-}
-
-function normalizeTeamOthers(raw) {
-  const list = Array.isArray(raw) ? raw : [];
-  const seen = new Set();
-  const out = [];
-  for (const item of list) {
-    const isObject = item && typeof item === 'object' && !Array.isArray(item);
-    const name = `${isObject ? item.name : item || ''}`.trim();
-    if (!name) continue;
-    const role = `${isObject ? item.role || 'Lainnya' : 'Lainnya'}`.trim() || 'Lainnya';
-    const key = `${role.toLowerCase()}|${name.toLowerCase()}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({
-      name,
-      role,
-      signature: isObject ? item.signature : null,
-    });
-  }
-  return out;
-}
 
 const HabitatMonitoringDetail = () => {
   const { id } = useParams();
@@ -90,35 +48,8 @@ const HabitatMonitoringDetail = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const payload = report?.payload && typeof report.payload === 'object' ? report.payload : {};
-  const habitatEntries = Array.isArray(payload.habitatEntries) ? payload.habitatEntries : [];
-  const visitorData =
-    payload.visitorData && typeof payload.visitorData === 'object' ? payload.visitorData : {};
-  const teamSnapshot = payload.teamSnapshot && typeof payload.teamSnapshot === 'object' ? payload.teamSnapshot : {};
-  const teamRoles = Array.isArray(teamSnapshot.roles) ? teamSnapshot.roles : [];
-  const teamOthers = normalizeTeamOthers(teamSnapshot.others);
-  const teamPhotos = Array.isArray(teamSnapshot.photoUrls) ? teamSnapshot.photoUrls : [];
-  const habitatPhotos = Array.isArray(visitorData.tjlPhotoUrls) ? visitorData.tjlPhotoUrls : [];
-
-  const markers = useMemo(() => {
-    const entries = Array.isArray(report?.payload?.habitatEntries)
-      ? report.payload.habitatEntries
-      : [];
-
-    return entries
-      .map((entry) => {
-        const point = locationMap[normalizeLocationKey(entry.location)] || DEFAULT_LOCATION_POINT;
-        return {
-          lat: point.lat,
-          lon: point.lon,
-          label: entry.location || 'Lokasi monitoring',
-          description: `${entry.officer1 || '-'} / ${entry.time || '-'}`,
-          color: '#2563eb',
-        };
-      })
-      .filter(Boolean);
-  }, [report]);
-
+  const detail = useMemo(() => normalizeHabitatReport(report), [report]);
+  const { visitorData, habitatEntries, teamSnapshot, markers, summary } = detail;
   const selectedPoint = markers[0] || null;
 
   if (loading && !report) {
@@ -160,8 +91,8 @@ const HabitatMonitoringDetail = () => {
 
       <div className="flex flex-wrap items-center gap-2 mb-5">
         <Badge className={`border ${reviewClassMap[report.status]}`}>{reviewLabelMap[report.status]}</Badge>
-        <Badge variant="outline">Area: {report.areaName || '-'}</Badge>
-        <Badge variant="outline">Pos: {report.postName || '-'}</Badge>
+        <Badge variant="outline">Area: {detail.areaName}</Badge>
+        <Badge variant="outline">Pos: {detail.postName}</Badge>
         <Badge variant="outline">Dikirim: {formatDateTime(report.submittedAt)}</Badge>
       </div>
 
@@ -176,11 +107,12 @@ const HabitatMonitoringDetail = () => {
                 <div className="flex-1">
                   <h2 className="text-xl font-bold mb-1">Monitoring Habitat</h2>
                   <p className="text-sm text-muted-foreground mb-3">
-                    Operator: {visitorData.operatorName || '-'}
+                    Operator: {visitorData.operatorName}
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline">Jumlah Entri Habitat: {habitatEntries.length}</Badge>
-                    <Badge variant="secondary">Temuan Manta: {visitorData.mantaSightingsCount ?? 0}</Badge>
+                    <Badge variant="outline">Entri Habitat: {habitatEntries.length}</Badge>
+                    <Badge variant="secondary">Wisatawan: {visitorData.touristCount}</Badge>
+                    <Badge variant="outline">Temuan Manta: {visitorData.mantaSightingsCount}</Badge>
                   </div>
                 </div>
               </div>
@@ -201,7 +133,7 @@ const HabitatMonitoringDetail = () => {
           ) : (
             <Card className="shadow-card">
               <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                Lokasi monitoring tidak memiliki koordinat peta.
+                Lokasi monitoring belum memiliki titik peta yang dikenali.
               </CardContent>
             </Card>
           )}
@@ -210,23 +142,50 @@ const HabitatMonitoringDetail = () => {
             <CardHeader>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <TreePine className="h-5 w-5 text-primary" />
-                Informasi Habitat ({habitatEntries.length})
+                Entri Habitat ({habitatEntries.length})
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {habitatEntries.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Tidak ada detail habitat pada laporan ini.</p>
               ) : (
-                habitatEntries.map((entry, index) => (
-                  <div key={`${entry.location || 'entry'}-${index}`} className="rounded-lg border border-border p-3 space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                      <p>Lokasi: {entry.location || '-'}</p>
-                      <p>Tanggal: {entry.date || '-'}</p>
-                      <p>Waktu: {entry.time || '-'}</p>
-                      <p>Petugas 1: {entry.officer1 || '-'}</p>
-                      <p>Petugas 2: {entry.officer2 || '-'}</p>
-                      <p>Petugas 3: {entry.officer3 || '-'}</p>
+                habitatEntries.map((entry) => (
+                  <div key={entry.id} className="rounded-lg border border-border p-4 space-y-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary">Entri #{entry.order}</Badge>
+                      <Badge variant="outline">{entry.location}</Badge>
                     </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <DetailField label="Lokasi" value={entry.location} />
+                      <DetailField label="Tanggal" value={entry.date} />
+                      <DetailField label="Waktu" value={entry.time} />
+                      <DetailField
+                        label="Jumlah Personel"
+                        value={entry.personnel.length > 0 ? `${entry.personnel.length} orang` : '-'}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">Personel Lapangan</p>
+                      {entry.personnel.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {entry.personnel.map((person) => (
+                            <div key={`${entry.id}-person-${person.slot}`} className="rounded-lg border border-border p-3 text-sm">
+                              <p>
+                                <span className="text-muted-foreground">Slot:</span> {person.label}
+                              </p>
+                              <p>
+                                <span className="text-muted-foreground">Nama:</span> {person.name}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Tidak ada personel yang tercatat.</p>
+                      )}
+                    </div>
+
                     <div>
                       <p className="text-xs text-muted-foreground mb-2">Tanda tangan petugas</p>
                       <SignaturePreview signature={entry.signature} />
@@ -241,25 +200,26 @@ const HabitatMonitoringDetail = () => {
             <CardHeader>
               <CardTitle className="text-base font-semibold">Data Monitoring dan Pelanggaran</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <p>Nama Operator: {visitorData.operatorName || '-'}</p>
-              <p>Jumlah Wisatawan: {visitorData.touristCount ?? 0}</p>
-              <p>Jumlah Guide: {visitorData.guideCount ?? 0}</p>
-              <p>Total Orang: {visitorData.totalPeople ?? 0}</p>
-              <p>Jumlah Temuan Manta: {visitorData.mantaSightingsCount ?? 0}</p>
-              <p>Ada Pelanggaran: {visitorData.hasViolation ? 'Ya' : 'Tidak'}</p>
-              <p>
-                Jenis Pelanggaran:{' '}
-                {Array.isArray(visitorData.violationTypes) && visitorData.violationTypes.length > 0
-                  ? visitorData.violationTypes.join(', ')
-                  : '-'}
-              </p>
-              <p>Kerusakan: {visitorData.damageDescription || '-'}</p>
-              <p>Tindakan: {visitorData.actionTaken || '-'}</p>
-              <p>Solusi: {visitorData.solution || '-'}</p>
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Dokumentasi / Foto TJL</p>
-                <AttachmentList items={habitatPhotos} emptyLabel="Tidak ada foto TJL." />
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <DetailField label="Nama Operator" value={visitorData.operatorName} />
+              <DetailField label="Jumlah Wisatawan" value={visitorData.touristCount} />
+              <DetailField label="Jumlah Guide" value={visitorData.guideCount} />
+              <DetailField label="Total Orang" value={visitorData.totalPeople} />
+              <DetailField label="Temuan Manta" value={visitorData.mantaSightingsCount} />
+              <DetailField label="Ada Pelanggaran" value={visitorData.hasViolation ? 'Ya' : 'Tidak'} />
+              <DetailField
+                label="Jenis Pelanggaran"
+                value={visitorData.violationTypes.length > 0 ? visitorData.violationTypes.join(', ') : '-'}
+                fullWidth
+              />
+              <DetailField label="Kerusakan" value={visitorData.damageDescription} fullWidth />
+              <DetailField label="Tindakan" value={visitorData.actionTaken} fullWidth />
+              <DetailField label="Solusi" value={visitorData.solution} fullWidth />
+              <div className="md:col-span-2 rounded-lg border border-border bg-card px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Dokumentasi / Foto TJL</p>
+                <div className="mt-2">
+                  <AttachmentList items={visitorData.tjlPhotoUrls} emptyLabel="Tidak ada foto TJL." />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -271,63 +231,34 @@ const HabitatMonitoringDetail = () => {
                 Snapshot Tim Lapangan
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {teamRoles.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Tidak ada snapshot tim pada laporan ini.</p>
-              ) : (
-                <div className="space-y-2">
-                  {teamRoles.map((entry, index) => (
-                    <div key={`team-role-${index}`} className="rounded-lg border border-border p-3 text-sm">
-                      <p>
-                        <span className="text-muted-foreground">Peran:</span> {entry.role || '-'}
-                      </p>
-                      <p>
-                        <span className="text-muted-foreground">Nama:</span> {entry.name || '-'}
-                      </p>
-                      <div className="mt-2">
-                        <p className="text-xs text-muted-foreground mb-1">Tanda tangan</p>
-                        <SignaturePreview signature={entry.signature} />
-                      </div>
-                    </div>
+            <CardContent className="space-y-4">
+              {(teamSnapshot.roles || []).length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {teamSnapshot.roles.map((member, index) => (
+                    <TeamMemberCard key={`team-role-${index}`} member={member} />
                   ))}
                 </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Tidak ada snapshot tim inti pada laporan ini.</p>
               )}
+
               <div className="space-y-2">
-                <p className="text-xs text-muted-foreground mb-1">Anggota lainnya</p>
-                {teamOthers.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">-</p>
+                <p className="text-xs text-muted-foreground">Anggota lainnya</p>
+                {(teamSnapshot.others || []).length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {teamSnapshot.others.map((member, index) => (
+                      <TeamMemberCard key={`team-other-${index}`} member={member} />
+                    ))}
+                  </div>
                 ) : (
-                  teamOthers.map((entry, index) => (
-                    <div key={`team-other-${index}`} className="rounded-lg border border-border p-3 text-sm">
-                      <p>
-                        <span className="text-muted-foreground">Peran:</span> {entry.role || 'Lainnya'}
-                      </p>
-                      <p>
-                        <span className="text-muted-foreground">Nama:</span> {entry.name || '-'}
-                      </p>
-                      <div className="mt-2">
-                        <p className="text-xs text-muted-foreground mb-1">Tanda tangan</p>
-                        <SignaturePreview signature={entry.signature} />
-                      </div>
-                    </div>
-                  ))
+                  <p className="text-sm text-muted-foreground">Tidak ada anggota tambahan.</p>
                 )}
               </div>
+
               <div>
                 <p className="text-xs text-muted-foreground mb-2">Swafoto Tim</p>
-                <AttachmentList items={teamPhotos} emptyLabel="Tidak ada swafoto tim." />
+                <AttachmentList items={teamSnapshot.photoUrls} emptyLabel="Tidak ada swafoto tim." />
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="text-base font-semibold">Payload Form Lengkap (Raw)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <pre className="max-h-[320px] overflow-auto rounded-md bg-muted p-3 text-xs">
-                {JSON.stringify(payload, null, 2)}
-              </pre>
             </CardContent>
           </Card>
         </div>
@@ -362,19 +293,19 @@ const HabitatMonitoringDetail = () => {
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
               <p>
-                Habitat Entry: <span className="text-foreground">{habitatEntries.length}</span>
+                Entri Habitat: <span className="text-foreground">{summary.habitatCount ?? habitatEntries.length}</span>
               </p>
               <p>
-                Wisatawan: <span className="text-foreground">{visitorData.touristCount ?? 0}</span>
+                Wisatawan: <span className="text-foreground">{summary.totalPeople ?? visitorData.totalPeople}</span>
               </p>
               <p>
-                Guide: <span className="text-foreground">{visitorData.guideCount ?? 0}</span>
+                Guide: <span className="text-foreground">{summary.guideCount ?? visitorData.guideCount}</span>
               </p>
               <p>
-                Total Orang: <span className="text-foreground">{visitorData.totalPeople ?? 0}</span>
+                Temuan Manta: <span className="text-foreground">{summary.mantaSightingsCount ?? visitorData.mantaSightingsCount}</span>
               </p>
               <p>
-                Temuan Manta: <span className="text-foreground">{visitorData.mantaSightingsCount ?? 0}</span>
+                Pelanggaran: <span className="text-foreground">{visitorData.hasViolation ? 'Ada' : 'Tidak ada'}</span>
               </p>
             </CardContent>
           </Card>
@@ -383,5 +314,27 @@ const HabitatMonitoringDetail = () => {
     </MainLayout>
   );
 };
+
+const DetailField = ({ label, value, fullWidth = false }) => (
+  <div className={fullWidth ? 'md:col-span-2 rounded-lg border border-border bg-card px-3 py-2' : 'rounded-lg border border-border bg-card px-3 py-2'}>
+    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+    <p className="mt-1 text-sm font-medium text-foreground whitespace-pre-wrap">{`${value ?? '-'}` || '-'}</p>
+  </div>
+);
+
+const TeamMemberCard = ({ member }) => (
+  <div className="rounded-lg border border-border p-3 text-sm">
+    <p>
+      <span className="text-muted-foreground">Peran:</span> {member.role || '-'}
+    </p>
+    <p>
+      <span className="text-muted-foreground">Nama:</span> {member.name || '-'}
+    </p>
+    <div className="mt-2">
+      <p className="text-xs text-muted-foreground mb-1">Tanda tangan</p>
+      <SignaturePreview signature={member.signature} />
+    </div>
+  </div>
+);
 
 export default HabitatMonitoringDetail;

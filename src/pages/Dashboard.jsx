@@ -15,6 +15,11 @@ import {
   reviewClassMap,
   reviewLabelMap,
 } from '@/lib/apiClient';
+import {
+  getReportRoute,
+  getReportSummaryLine,
+  getReportTypeLabel,
+} from '@/lib/reportPresentation';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -57,6 +62,20 @@ const Dashboard = () => {
     [reports],
   );
 
+  const reportTypeCounts = useMemo(
+    () =>
+      reports.reduce(
+        (accumulator, item) => {
+          if (item.type === 'PATROL_JAGA_LAUT') accumulator.patrol += 1;
+          else if (item.type === 'RESOURCE_USE_MONITORING') accumulator.resourceUse += 1;
+          else if (item.type === 'OTHER_MONITORING') accumulator.habitat += 1;
+          return accumulator;
+        },
+        { patrol: 0, resourceUse: 0, habitat: 0 },
+      ),
+    [reports],
+  );
+
   return (
     <MainLayout title="Dashboard" subtitle="Ringkasan laporan patroli & monitoring">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
@@ -96,6 +115,11 @@ const Dashboard = () => {
                   {summary?.byStatus?.pending ?? 0} laporan menunggu verifikasi
                 </span>
               </div>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <span>Patroli: {reportTypeCounts.patrol}</span>
+                <span>RUM: {reportTypeCounts.resourceUse}</span>
+                <span>Habitat: {reportTypeCounts.habitat}</span>
+              </div>
             </div>
           </MapCard>
         </div>
@@ -120,26 +144,24 @@ const Dashboard = () => {
                     <div
                       key={item.id}
                       className="group w-full min-w-0 rounded-lg border border-transparent bg-card px-4 py-3 transition-all hover:border-primary/20 hover:bg-primary/5 cursor-pointer"
-                      onClick={() => {
-                        if (item.type === 'PATROL_JAGA_LAUT') navigate(`/patrols/${item.id}`);
-                        else if (item.type === 'RESOURCE_USE_MONITORING') navigate(`/monitoring-megafauna/${item.id}`);
-                        else navigate(`/monitoring-habitat/${item.id}`);
-                      }}
+                      onClick={() => navigate(getReportRoute(item))}
                     >
                       <div className="flex flex-wrap items-start gap-3">
                         <div className="flex-1 min-w-0">
                           <h4 className="text-sm font-semibold text-foreground truncate">{item.reportCode}</h4>
                           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                             <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                              {item.type === 'PATROL_JAGA_LAUT'
-                                ? 'Patroli'
-                                : item.type === 'RESOURCE_USE_MONITORING'
-                                  ? 'RUM'
-                                  : 'Monitoring Habitat'}
+                              {getReportTypeLabel(item.type)}
                             </span>
                             <span className="h-1 w-1 rounded-full bg-muted-foreground/60" />
                             <span>{formatDateTime(item.submittedAt)}</span>
                           </div>
+                          <p className="mt-2 text-xs text-muted-foreground truncate">
+                            {[item.areaName, item.postName].filter(Boolean).join(' · ') || 'Tanpa konteks area'}
+                          </p>
+                          <p className="mt-1 text-xs text-foreground/80 line-clamp-2">
+                            {getReportSummaryLine(item)}
+                          </p>
                         </div>
                         <div className="ml-auto shrink-0">
                           <Badge className={`border ${reviewClassMap[item.status]}`}>
@@ -180,7 +202,7 @@ const Dashboard = () => {
               <div
                 key={item.id}
                 className="p-4 rounded-xl border border-border bg-card hover:border-primary/30 transition-colors cursor-pointer"
-                onClick={() => navigate(`/patrols/${item.id}`)}
+                onClick={() => navigate(getReportRoute(item))}
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -193,6 +215,7 @@ const Dashboard = () => {
                 <h4 className="font-semibold text-foreground">{item.reportCode}</h4>
                 <p className="text-sm text-muted-foreground mt-1">{item.areaName}</p>
                 <p className="text-xs text-muted-foreground mt-2">{item.submittedBy}</p>
+                <p className="text-xs text-foreground/80 mt-2">{getReportSummaryLine(item)}</p>
               </div>
             ))}
           </div>

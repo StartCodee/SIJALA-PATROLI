@@ -67,6 +67,14 @@ export const mapPatrolReportFindings = (report) => {
     const photoUrls = toArray(finding?.photoUrls)
       .map((item) => toText(item, '').trim())
       .filter(Boolean);
+    const explicitLocationZone = toText(finding?.locationZone, '').trim();
+    const derivedLocationZone = [
+      toText(finding?.locationZoneGroup, '').trim(),
+      toText(finding?.locationZoneDetail, '').trim(),
+    ]
+      .filter(Boolean)
+      .join(' / ');
+    const locationZone = explicitLocationZone || derivedLocationZone || '-';
 
     return {
       id: composeFindingId(report.id, index),
@@ -83,7 +91,7 @@ export const mapPatrolReportFindings = (report) => {
       locationName: toText(finding?.locationName, 'Lokasi Tidak Diketahui'),
       gpsNumber: toText(finding?.gpsNumber),
       zoneCoordinate: toText(finding?.zoneCoordinate),
-      locationZone: toText(finding?.locationZone),
+      locationZone,
       mapPoint: toMapPoint(finding?.mapPoint),
 
       vesselName: toText(finding?.vesselName),
@@ -93,7 +101,9 @@ export const mapPatrolReportFindings = (report) => {
       crewCount: Number(finding?.crewCount ?? 0),
       passengerCount: Number(finding?.passengerCount ?? 0),
       shipKind: toText(finding?.shipKind),
+      shipKindOther: toText(finding?.shipKindOther, ''),
       shipCategory: toText(finding?.shipCategory),
+      shipCategoryOther: toText(finding?.shipCategoryOther, ''),
       engineType: toText(finding?.engineType),
       shipOrigin: toText(finding?.shipOrigin),
 
@@ -102,6 +112,8 @@ export const mapPatrolReportFindings = (report) => {
       violationDetail,
       actionTaken: toText(finding?.actionTaken),
       fishingTools,
+      fishingToolsOther: toText(finding?.fishingToolsOther, ''),
+      notes: toText(finding?.notes, ''),
       photoUrls,
       rawFinding: finding,
       rawReport: report,
@@ -136,7 +148,7 @@ export const mapPatrolReportsToIncidents = (reports = []) =>
 export const isWebImageUrl = (url) => typeof url === 'string' && /^https?:\/\//i.test(url.trim());
 
 function apiOrigin() {
-  const configured = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4200/api';
+  const configured = import.meta.env.VITE_API_BASE_URL || '/api';
   try {
     return new URL(configured).origin;
   } catch {

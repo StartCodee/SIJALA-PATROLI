@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/context/AuthContext';
+import { consumeSsoReturnTo } from '@/lib/authRedirect';
 
 const AuthCallbackPage = () => {
   const { completeSsoLogin } = useAuth();
@@ -72,7 +73,7 @@ const AuthCallbackPage = () => {
         if (cancelled) {
           return;
         }
-        navigate('/', { replace: true });
+        navigate(consumeSsoReturnTo('/'), { replace: true });
       } catch (callbackError) {
         if (!cancelled) {
           setCallbackState({
@@ -113,7 +114,7 @@ const AuthCallbackPage = () => {
           {callbackState.status === 'error' ? (
             <div className="flex flex-wrap gap-2">
               <Button className="btn-ocean" onClick={() => navigate('/login', { replace: true })}>
-                Kembali ke Login
+                Coba Login Lagi
               </Button>
               <Button variant="outline" onClick={() => window.location.reload()}>
                 Coba Lagi

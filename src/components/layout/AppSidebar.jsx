@@ -1,219 +1,361 @@
-import { useEffect, useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useEffect, useRef, useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import {
-    LayoutDashboard,
-    Route,
-    Users,
-    Anchor,
-  Ship,
-  FileWarning,
-  LogOut,
+  Anchor,
+  Camera,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Camera,
-    Fish,
-    TreePine,
-    ChevronDown,
-    ChevronUp,
-    ShieldCheck,
-    ArrowUpRight,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useAuth } from '@/context/AuthContext';
-import LogoKkpRajaAmpat from '@/assets/KKP-RajaAmpat.png';
-import TribbleImage from '@/assets/image/tribble.png';
+  ChevronUp,
+  Fish,
+  LayoutDashboard,
+  LogOut,
+  Route,
+  ShieldCheck,
+  Ship,
+  TreePine,
+  Users,
+  X,
+  FileWarning,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/i18n/LanguageContext";
+import logoRajaAmpat from "@/assets/KKP-RajaAmpat.png";
+import motifSidebar from "@/assets/motif-sidebar.svg";
+
 const mainNavItems = [
-    {
-        title: 'Dashboard',
-        href: '/',
-        icon: LayoutDashboard,
-    },
-    // {
-    //     title: 'Pemantauan Langsung',
-    //     href: '/monitoring',
-    //     icon: MapPin,
-    // },
-    // {
-    //     title: 'Kapal',
-    //     href: '/vessels',
-    //     icon: Ship,
-    // },
-    {
-        title: 'Personel',
-        href: '/crew',
-        icon: Users,
-    },
-    // {
-    //     title: 'Penugasan Crew',
-    //     href: '/crew-assignments',
-    //     icon: ClipboardList,
-    // },
-    {
-        title: 'Pelabuhan/Pos Jaga',
-        href: '/guard-posts',
-        icon: Anchor,
-    },
-    {
-        title: 'Management Speedboat',
-        href: '/speedboats',
-        icon: Ship,
-    },
-    {
-        title: 'Monitoring Pemanfaatan (RUM)',
-        href: '/monitoring-megafauna',
-        icon: Fish,
-    },
-    {
-        title: 'Monitoring Habitat',
-        href: '/monitoring-habitat',
-        icon: TreePine,
-    },
+  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/crew", icon: Users, label: "Personel" },
+  { to: "/guard-posts", icon: Anchor, label: "Pelabuhan/Pos Jaga" },
+  { to: "/speedboats", icon: Ship, label: "Management Speedboat" },
+  { to: "/monitoring-megafauna", icon: Fish, label: "Monitoring Pemanfaatan (RUM)" },
+  { to: "/monitoring-habitat", icon: TreePine, label: "Monitoring Habitat" },
 ];
+
 const patrolGroupItems = [
-    {
-        title: 'Daftar Patroli',
-        href: '/patrols',
-        icon: Route,
-    },
-    {
-        title: 'Laporan Kejadian',
-        href: '/incidents',
-        icon: FileWarning,
-    },
-    {
-        title: 'Temuan',
-        href: '/findings',
-        icon: Camera,
-    },
+  { to: "/patrols", icon: Route, label: "Daftar Patroli" },
+  { to: "/incidents", icon: FileWarning, label: "Laporan Kejadian" },
+  { to: "/findings", icon: Camera, label: "Temuan" },
 ];
-export const AppSidebar = ({ collapsed, onToggle }) => {
-    const auth = useAuth();
-    const location = useLocation();
-    const ssoPortalBaseUrl = String(import.meta.env.VITE_SSO_PORTAL_URL || 'http://localhost:9000').replace(/\/+$/, '');
-    const ssoPortalHomeUrl = `${ssoPortalBaseUrl}/`;
-    const ssoProfileUrl = `${ssoPortalBaseUrl}/#/profile`;
-    const userName = auth.user?.fullName || auth.user?.name || 'Pengguna';
-    const userRole = String(auth.user?.role || 'viewer');
-    const profileInfo = {
-        name: userName,
-        role: userRole,
-        initials: userName
-            .split(' ')
-            .map((part) => part?.[0] || '')
-            .join('')
-            .slice(0, 2)
-            .toUpperCase() || 'US',
-        avatar: auth.user?.photoUrl || '/placeholder.svg',
-    };
-    const isPathActive = (href) => location.pathname === href ||
-        (href !== '/' && location.pathname.startsWith(`${href}/`));
-    const patrolGroupActive = patrolGroupItems.some((item) => isPathActive(item.href));
-    const [patrolGroupOpen, setPatrolGroupOpen] = useState(patrolGroupActive);
-    useEffect(() => {
-        if (patrolGroupActive)
-            setPatrolGroupOpen(true);
-    }, [patrolGroupActive]);
-    const handleLogout = async () => {
-        await auth.logout();
-    };
-    const renderExternalNavItem = (item) => (<a key={item.href} href={item.href} className={cn('nav-item', collapsed && 'justify-center px-2')} title={collapsed ? item.title : undefined}>
-        <item.icon className="w-5 h-5 shrink-0"/>
-        {!collapsed && <span className="truncate">{item.title}</span>}
-      </a>);
-    return (<aside className={cn('fixed inset-y-0 left-0 z-40 flex h-screen flex-col bg-sidebar border-r border-sidebar-border transition-[width] duration-300 shadow-2xl', collapsed ? 'w-16' : 'w-64')} style={{ background: 'var(--gradient-sidebar)' }}>
-      {/* Logo */}
-      <div className="flex items-center gap-3 p-4 border-b border-sidebar-border">
-        <div className={cn('flex items-center gap-3 flex-1 min-w-0', collapsed && 'justify-center')}>
-          <div className={cn('rounded-xl bg-white/95 ring-1 ring-white/25 p-1 shadow-sm', collapsed ? 'h-10 w-10' : 'h-12 w-12')}>
-            <img src={LogoKkpRajaAmpat} alt="KKP Raja Ampat" className="h-full w-full object-contain drop-shadow-sm"/>
+
+function toUserRoleLabel(role) {
+  return String(role || "viewer")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function initialsOf(name) {
+  return String(name || "Pengguna")
+    .split(" ")
+    .map((part) => part.trim().charAt(0))
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "US";
+}
+
+export function AppSidebar({
+  collapsed,
+  onToggle,
+  mobileOpen = false,
+  onMobileClose,
+}) {
+  const auth = useAuth();
+  const { language, setLanguage } = useLanguage();
+  const location = useLocation();
+  const previousPath = useRef(location.pathname);
+  const [patrolGroupOpen, setPatrolGroupOpen] = useState(
+    location.pathname.startsWith("/patrols") ||
+      location.pathname.startsWith("/incidents") ||
+      location.pathname.startsWith("/findings"),
+  );
+  const isCollapsed = collapsed && !mobileOpen;
+  const ssoPortalBaseUrl = String(import.meta.env.VITE_SSO_PORTAL_URL || "/sso").replace(/\/+$/, "");
+
+  useEffect(() => {
+    if (previousPath.current !== location.pathname) {
+      previousPath.current = location.pathname;
+      onMobileClose?.();
+    }
+  }, [location.pathname, onMobileClose]);
+
+  useEffect(() => {
+    if (
+      location.pathname.startsWith("/patrols") ||
+      location.pathname.startsWith("/incidents") ||
+      location.pathname.startsWith("/findings")
+    ) {
+      setPatrolGroupOpen(true);
+    }
+  }, [location.pathname]);
+
+  const handleLogout = async () => {
+    await auth.logout();
+  };
+
+  const userName = auth.user?.fullName || auth.user?.name || auth.user?.email || "Pengguna";
+  const userRole = toUserRoleLabel(auth.user?.role);
+  const userInitials = initialsOf(userName);
+
+  const isPathActive = (href) =>
+    location.pathname === href || (href !== "/" && location.pathname.startsWith(`${href}/`));
+
+  const handleMobileClose = () => {
+    onMobileClose?.();
+  };
+
+  return (
+    <>
+      <div
+        className={cn(
+          "fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-sm transition-opacity md:hidden",
+          mobileOpen ? "opacity-100" : "pointer-events-none opacity-0",
+        )}
+        onClick={handleMobileClose}
+        aria-hidden="true"
+      />
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-sidebar-border bg-sidebar shadow-2xl transition-[width,transform] duration-300 md:static md:z-auto md:shadow-none",
+          "w-[82vw] max-w-[320px] md:w-[260px]",
+          isCollapsed && "md:w-[72px]",
+          mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+        )}
+        style={{ background: "var(--gradient-sidebar)" }}
+      >
+        <img
+          src={motifSidebar}
+          alt=""
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none select-none absolute bottom-0 left-0",
+            "opacity-100 w-[10px] md:w-[140px]",
+            isCollapsed && "md:w-[140px]",
+          )}
+        />
+
+        <div className="flex items-center gap-3 border-b border-sidebar-border p-4">
+          <div className={cn("flex min-w-0 flex-1 items-center gap-3", isCollapsed && "md:justify-center md:gap-0")}>
+            <div
+              className={cn(
+                "h-12 w-12 rounded-xl bg-white/95 p-1 shadow-sm ring-1 ring-white/25",
+                isCollapsed && "md:h-10 md:w-10",
+              )}
+            >
+              <img
+                src={logoRajaAmpat}
+                alt="Konservasi Raja Ampat"
+                className="h-full w-full object-contain drop-shadow-sm"
+              />
+            </div>
+            {!isCollapsed && (
+              <div className="min-w-0 flex-1">
+                <h1 className="truncate text-base font-bold leading-tight text-white">SIJALA</h1>
+                <p className="truncate text-[11px] text-sidebar-foreground/70">Patroli Jaga Laut</p>
+              </div>
+            )}
           </div>
-          {!collapsed && (<div className="flex-1 min-w-0">
-              <h1 className="text-base font-bold text-white truncate leading-tight">SIJALA</h1>
-              <p className="text-[11px] text-sidebar-foreground/70 truncate">Patroli Jaga Laut</p>
-            </div>)}
+          <button
+            type="button"
+            onClick={handleMobileClose}
+            className="rounded-lg p-1.5 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground md:hidden"
+            aria-label="Tutup sidebar"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
-      </div>
 
-      <img src={TribbleImage} alt="Tribble" className="pointer-events-none absolute bottom-[-5px] w-[150px]"/>
+        <nav className="relative z-10 flex-1 overflow-y-auto custom-scrollbar py-4">
+          <div className="space-y-1">
+            {!isCollapsed && (
+              <p className="mb-2 px-4 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+                Menu Utama
+              </p>
+            )}
 
-      {/* Navigation */}
-      <nav className="relative z-10 flex-1 overflow-y-auto custom-scrollbar py-4">
-        {!collapsed && (<p className="text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-wider px-4 mb-2">
-            Menu Utama
-          </p>)}
-        <div className="space-y-1">
-          {mainNavItems.map((item) => {
-            const isActive = isPathActive(item.href);
-            return (<NavLink key={item.href} to={item.href} className={cn('nav-item', isActive && 'active', collapsed && 'justify-center px-2')} title={collapsed ? item.title : undefined}>
-                <item.icon className="w-5 h-5 shrink-0"/>
-                {!collapsed && <span className="truncate">{item.title}</span>}
-              </NavLink>);
-        })}
+            {mainNavItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === "/"}
+                className={({ isActive }) =>
+                  cn("nav-item", isActive && "active", isCollapsed && "justify-center px-2")
+                }
+                title={isCollapsed ? item.label : undefined}
+                onClick={handleMobileClose}
+              >
+                <item.icon className="h-5 w-5 flex-shrink-0" />
+                {!isCollapsed && <span className="truncate">{item.label}</span>}
+              </NavLink>
+            ))}
 
-          {collapsed ? (<NavLink to="/patrols" className={cn('nav-item justify-center px-2', patrolGroupActive && 'active')} title="Patroli">
-              <Route className="w-5 h-5 shrink-0"/>
-            </NavLink>) : (<div className="space-y-1">
-              <button type="button" className={cn('nav-item w-full justify-between', patrolGroupActive && 'active')} onClick={() => setPatrolGroupOpen((prev) => !prev)} aria-expanded={patrolGroupOpen} aria-label="Toggle menu patroli">
-                <span className="flex items-center gap-3 min-w-0">
-                  <Route className="w-5 h-5 shrink-0"/>
-                  <span className="truncate">Patroli</span>
-                </span>
-                {patrolGroupOpen ? (<ChevronUp className="w-4 h-4 shrink-0"/>) : (<ChevronDown className="w-4 h-4 shrink-0"/>)}
-              </button>
-              <div className={cn('overflow-hidden transition-all duration-200', patrolGroupOpen ? 'max-h-52' : 'max-h-0')}>
-                <div className="space-y-1 pt-1">
-                  {patrolGroupItems.map((item) => {
-                    const isActive = isPathActive(item.href);
-                    return (<NavLink key={item.href} to={item.href} className={cn('nav-item py-2 pl-11 pr-3 text-sm', isActive && 'active')} title={item.title}>
-                        <item.icon className="w-4 h-4 shrink-0"/>
-                        <span className="truncate">{item.title}</span>
-                      </NavLink>);
-                })}
+            {isCollapsed ? (
+              <NavLink
+                to="/patrols"
+                className={cn(
+                  "nav-item justify-center px-2",
+                  (isPathActive("/patrols") || isPathActive("/incidents") || isPathActive("/findings")) &&
+                    "active",
+                )}
+                title="Patroli"
+                onClick={handleMobileClose}
+              >
+                <Route className="h-5 w-5 flex-shrink-0" />
+              </NavLink>
+            ) : (
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  className={cn(
+                    "nav-item w-full justify-between",
+                    (isPathActive("/patrols") || isPathActive("/incidents") || isPathActive("/findings")) &&
+                      "active",
+                  )}
+                  onClick={() => setPatrolGroupOpen((prev) => !prev)}
+                  aria-expanded={patrolGroupOpen}
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    <Route className="h-5 w-5 flex-shrink-0" />
+                    <span className="truncate">Patroli</span>
+                  </span>
+                  {patrolGroupOpen ? (
+                    <ChevronUp className="h-4 w-4 flex-shrink-0" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 flex-shrink-0" />
+                  )}
+                </button>
+
+                <div className={cn("overflow-hidden transition-all duration-200", patrolGroupOpen ? "max-h-52" : "max-h-0")}>
+                  <div className="space-y-1 pt-1">
+                    {patrolGroupItems.map((item) => (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        className={({ isActive }) =>
+                          cn("nav-item py-2 pl-11 pr-3 text-sm", isActive && "active")
+                        }
+                        title={item.label}
+                        onClick={handleMobileClose}
+                      >
+                        <item.icon className="h-4 w-4 flex-shrink-0" />
+                        <span className="truncate">{item.label}</span>
+                      </NavLink>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>)}
+            )}
+          </div>
+        </nav>
 
-          {renderExternalNavItem({
-            title: 'Portal SSO',
-            href: ssoPortalHomeUrl,
-            icon: ShieldCheck,
-          })}
+        <button
+          type="button"
+          onClick={onToggle}
+          className="absolute -right-3 top-24 hidden rounded-full border border-sidebar-border bg-sidebar p-1.5 transition-colors hover:bg-sidebar-accent md:flex"
+          aria-label={isCollapsed ? "Perluas menu samping" : "Ciutkan menu samping"}
+        >
+          {isCollapsed ? (
+            <ChevronRight className="h-3.5 w-3.5 text-sidebar-foreground" />
+          ) : (
+            <ChevronLeft className="h-3.5 w-3.5 text-sidebar-foreground" />
+          )}
+        </button>
+
+        <div className={cn("border-t border-sidebar-border p-4", isCollapsed && "md:flex md:flex-col md:items-center md:gap-2")}>
+          {!isCollapsed && (
+            <div className="mb-3 rounded-lg border border-sidebar-border/70 bg-sidebar-accent/30 p-2">
+              <p className="text-[10px] uppercase tracking-wider text-white">Bahasa</p>
+              <div className="mt-1 grid grid-cols-2 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setLanguage("id")}
+                  className={cn(
+                    "flex items-center justify-center rounded-md px-2 py-1 transition-colors",
+                    language === "id"
+                      ? "bg-sidebar-primary/20 ring-1 ring-sidebar-primary/40"
+                      : "hover:bg-sidebar-accent",
+                  )}
+                  aria-pressed={language === "id"}
+                  aria-label="Bahasa Indonesia"
+                >
+                  <img src="/flags/id.svg" alt="Bendera Indonesia" className="h-4 w-6 rounded-[2px] object-cover" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLanguage("en")}
+                  className={cn(
+                    "flex items-center justify-center rounded-md px-2 py-1 transition-colors",
+                    language === "en"
+                      ? "bg-sidebar-primary/20 ring-1 ring-sidebar-primary/40"
+                      : "hover:bg-sidebar-accent",
+                  )}
+                  aria-pressed={language === "en"}
+                  aria-label="Bahasa Inggris"
+                >
+                  <img src="/flags/gb.svg" alt="Bendera Inggris" className="h-4 w-6 rounded-[2px] object-cover" />
+                </button>
+              </div>
+              <a
+                href={`${ssoPortalBaseUrl}/#/profile`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 flex items-center justify-center gap-2 rounded-md px-2 py-1.5 text-xs text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                <span>Buka Portal SSO</span>
+              </a>
+            </div>
+          )}
+
+          {!isCollapsed ? (
+            <div className="flex items-center gap-3">
+              <NavLink
+                to="/profile"
+                className="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1.5 transition-colors hover:bg-sidebar-accent"
+                onClick={handleMobileClose}
+                title="Profil"
+              >
+                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-sidebar-primary/20">
+                  <span className="text-sm font-semibold text-sidebar-primary">{userInitials}</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-sidebar-foreground">{userName}</p>
+                  <p className="text-[10px] text-sidebar-foreground/60">{userRole}</p>
+                </div>
+              </NavLink>
+              <button
+                type="button"
+                className="rounded-lg p-1.5 transition-colors hover:bg-sidebar-accent"
+                onClick={handleLogout}
+                title="Keluar"
+              >
+                <LogOut className="h-4 w-4 text-sidebar-foreground/60" />
+              </button>
+            </div>
+          ) : (
+            <>
+              <NavLink
+                to="/profile"
+                className="flex items-center justify-center rounded-lg p-2 text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                onClick={handleMobileClose}
+                title="Profil"
+              >
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-primary/20 text-xs font-semibold text-sidebar-primary">
+                  {userInitials}
+                </div>
+              </NavLink>
+              <button
+                type="button"
+                className="rounded-lg p-2 text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                onClick={handleLogout}
+                title="Keluar"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </>
+          )}
         </div>
-
-      </nav>
-
-      <div className={cn('border-t border-sidebar-border p-4', collapsed && 'flex flex-col items-center gap-2')}>
-        {!collapsed ? (<div className="flex items-center gap-2">
-            <a href={ssoProfileUrl} className="flex flex-1 items-center gap-3 rounded-lg p-2 text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground">
-              <div className="h-9 w-9 rounded-full bg-sidebar-primary/20 flex items-center justify-center overflow-hidden">
-                <img src={profileInfo.avatar} alt={profileInfo.name} className="h-full w-full object-cover"/>
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{profileInfo.name}</p>
-                <p className="text-[10px] text-sidebar-foreground/60">{profileInfo.role}</p>
-              </div>
-            </a>
-            <a href={ssoProfileUrl} className="p-2 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors" aria-label="Buka profil SSO" title="Buka profil SSO">
-              <ArrowUpRight className="w-4 h-4"/>
-            </a>
-            <button type="button" onClick={handleLogout} className="p-2 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors" aria-label="Keluar" title="Keluar">
-              <LogOut className="w-4 h-4"/>
-            </button>
-          </div>) : (<>
-            <a href={ssoProfileUrl} className="flex items-center justify-center rounded-lg p-2 text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground" title="Profil SSO">
-              <div className="h-9 w-9 rounded-full bg-sidebar-primary/20 flex items-center justify-center overflow-hidden text-xs font-semibold text-sidebar-primary">
-                {profileInfo.initials}
-              </div>
-            </a>
-            <button type="button" onClick={handleLogout} className="p-2 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors" aria-label="Keluar" title="Keluar">
-              <LogOut className="w-4 h-4"/>
-            </button>
-          </>)}
-      </div>
-
-      {/* Collapse Toggle */}
-      <button type="button" onClick={onToggle} className="absolute -right-3 top-24 hidden md:flex bg-sidebar border border-sidebar-border rounded-full p-1.5 hover:bg-sidebar-accent transition-colors" aria-label={collapsed ? 'Perluas menu samping' : 'Ciutkan menu samping'} title={collapsed ? 'Perluas menu samping' : 'Ciutkan menu samping'}>
-        {collapsed ? (<ChevronRight className="w-3.5 h-3.5 text-sidebar-foreground"/>) : (<ChevronLeft className="w-3.5 h-3.5 text-sidebar-foreground"/>)}
-      </button>
-    </aside>);
-};
+      </aside>
+    </>
+  );
+}

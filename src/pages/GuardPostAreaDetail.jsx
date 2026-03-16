@@ -47,7 +47,7 @@ import { TablePaginationBar } from '@/components/table/TablePaginationBar';
 import { useToast } from '@/hooks/use-toast';
 import { apiClient } from '@/lib/apiClient';
 
-const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4200';
+const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 const API_ORIGIN = RAW_API_BASE_URL.replace(/\/api\/?$/, '').replace(/\/+$/, '');
 
 const typeLabels = {
