@@ -68,7 +68,7 @@ const HabitatMonitoringDetail = () => {
         <Card className="shadow-card">
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">Laporan monitoring habitat tidak ditemukan.</p>
-            <Button className="mt-4" onClick={() => navigate('/monitoring-habitat')}>
+            <Button className="mt-4" onClick={() => navigate('/monitoring-habitat/list')}>
               Kembali ke Daftar
             </Button>
           </CardContent>
@@ -83,7 +83,7 @@ const HabitatMonitoringDetail = () => {
         variant="ghost"
         size="sm"
         className="mb-4 -ml-2"
-        onClick={() => navigate('/monitoring-habitat')}
+        onClick={() => navigate('/monitoring-habitat/list')}
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
         Kembali ke Daftar
