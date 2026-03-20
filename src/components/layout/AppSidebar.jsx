@@ -1,12 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+// import { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   Anchor,
-  Camera,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
   Fish,
   LayoutDashboard,
   LogOut,
@@ -16,8 +14,25 @@ import {
   TreePine,
   Users,
   X,
-  FileWarning,
 } from "lucide-react";
+// import {
+//   Anchor,
+//   Camera,
+//   ChevronDown,
+//   ChevronLeft,
+//   ChevronRight,
+//   ChevronUp,
+//   Fish,
+//   LayoutDashboard,
+//   LogOut,
+//   Route,
+//   ShieldCheck,
+//   Ship,
+//   TreePine,
+//   Users,
+//   X,
+//   FileWarning,
+// } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/i18n/LanguageContext";
@@ -31,13 +46,14 @@ const mainNavItems = [
   { to: "/speedboats", icon: Ship, label: "Management Speedboat" },
   { to: "/monitoring-megafauna", icon: Fish, label: "Monitoring Pemanfaatan (RUM)" },
   { to: "/monitoring-habitat", icon: TreePine, label: "Monitoring Habitat" },
+  { to: "/patrols", icon: Route, label: "Patroli" },
 ];
 
-const patrolGroupItems = [
-  { to: "/patrols", icon: Route, label: "Daftar Patroli" },
-  { to: "/incidents", icon: FileWarning, label: "Laporan Kejadian" },
-  { to: "/findings", icon: Camera, label: "Temuan" },
-];
+// const patrolGroupItems = [
+//   { to: "/patrols", icon: Route, label: "Daftar Patroli" },
+//   { to: "/incidents", icon: FileWarning, label: "Laporan Kejadian" },
+//   { to: "/findings", icon: Camera, label: "Temuan" },
+// ];
 
 function toUserRoleLabel(role) {
   return String(role || "viewer")
@@ -64,11 +80,11 @@ export function AppSidebar({
   const { language, setLanguage } = useLanguage();
   const location = useLocation();
   const previousPath = useRef(location.pathname);
-  const [patrolGroupOpen, setPatrolGroupOpen] = useState(
-    location.pathname.startsWith("/patrols") ||
-      location.pathname.startsWith("/incidents") ||
-      location.pathname.startsWith("/findings"),
-  );
+  // const [patrolGroupOpen, setPatrolGroupOpen] = useState(
+  //   location.pathname.startsWith("/patrols") ||
+  //     location.pathname.startsWith("/incidents") ||
+  //     location.pathname.startsWith("/findings"),
+  // );
   const isCollapsed = collapsed && !mobileOpen;
   const ssoPortalBaseUrl = String(import.meta.env.VITE_SSO_PORTAL_URL || "/sso").replace(/\/+$/, "");
 
@@ -79,15 +95,15 @@ export function AppSidebar({
     }
   }, [location.pathname, onMobileClose]);
 
-  useEffect(() => {
-    if (
-      location.pathname.startsWith("/patrols") ||
-      location.pathname.startsWith("/incidents") ||
-      location.pathname.startsWith("/findings")
-    ) {
-      setPatrolGroupOpen(true);
-    }
-  }, [location.pathname]);
+  // useEffect(() => {
+  //   if (
+  //     location.pathname.startsWith("/patrols") ||
+  //     location.pathname.startsWith("/incidents") ||
+  //     location.pathname.startsWith("/findings")
+  //   ) {
+  //     setPatrolGroupOpen(true);
+  //   }
+  // }, [location.pathname]);
 
   const handleLogout = async () => {
     await auth.logout();
@@ -97,8 +113,8 @@ export function AppSidebar({
   const userRole = toUserRoleLabel(auth.user?.role);
   const userInitials = initialsOf(userName);
 
-  const isPathActive = (href) =>
-    location.pathname === href || (href !== "/" && location.pathname.startsWith(`${href}/`));
+  // const isPathActive = (href) =>
+  //   location.pathname === href || (href !== "/" && location.pathname.startsWith(`${href}/`));
 
   const handleMobileClose = () => {
     onMobileClose?.();
@@ -189,6 +205,7 @@ export function AppSidebar({
               </NavLink>
             ))}
 
+            {/*
             {isCollapsed ? (
               <NavLink
                 to="/patrols"
@@ -245,6 +262,7 @@ export function AppSidebar({
                 </div>
               </div>
             )}
+            */}
           </div>
         </nav>
 

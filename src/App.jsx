@@ -12,6 +12,7 @@ import Dashboard from './pages/Dashboard';
 import LiveMonitoring from './pages/LiveMonitoring';
 import VesselList from './pages/VesselList';
 import VesselDetail from './pages/VesselDetail';
+import PatrolDashboardPage from './pages/patrol-dashboard/PatrolDashboardPage';
 import PatrolList from './pages/PatrolList';
 import PatrolDetail from './pages/PatrolDetail';
 import IncidentList from './pages/IncidentList';
@@ -19,8 +20,10 @@ import IncidentCreate from './pages/IncidentCreate';
 import IncidentDetail from './pages/IncidentDetail';
 import Findings from './pages/Findings';
 import FindingDetail from './pages/FindingDetail';
+import RumDashboardPage from './pages/rum-dashboard/RumDashboardPage';
 import MegafaunaObservationList from './pages/MegafaunaObservationList';
 import MegafaunaObservationDetail from './pages/MegafaunaObservationDetail';
+import HabitatDashboardPage from './pages/habitat-dashboard/HabitatDashboardPage';
 import HabitatMonitoringList from './pages/HabitatMonitoringList';
 import HabitatMonitoringDetail from './pages/HabitatMonitoringDetail';
 import CrewList from './pages/CrewList';
@@ -150,6 +153,14 @@ const App = () => (
                   path="/patrols"
                   element={(
                     <ProtectedRoute>
+                      <PatrolDashboardPage />
+                    </ProtectedRoute>
+                  )}
+                />
+                <Route
+                  path="/patrols/list"
+                  element={(
+                    <ProtectedRoute>
                       <PatrolList />
                     </ProtectedRoute>
                   )}
@@ -254,6 +265,14 @@ const App = () => (
                   path="/monitoring-megafauna"
                   element={(
                     <ProtectedRoute>
+                      <RumDashboardPage />
+                    </ProtectedRoute>
+                  )}
+                />
+                <Route
+                  path="/monitoring-megafauna/list"
+                  element={(
+                    <ProtectedRoute>
                       <MegafaunaObservationList />
                     </ProtectedRoute>
                   )}
@@ -268,6 +287,14 @@ const App = () => (
                 />
                 <Route
                   path="/monitoring-habitat"
+                  element={(
+                    <ProtectedRoute>
+                      <HabitatDashboardPage />
+                    </ProtectedRoute>
+                  )}
+                />
+                <Route
+                  path="/monitoring-habitat/list"
                   element={(
                     <ProtectedRoute>
                       <HabitatMonitoringList />

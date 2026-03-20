@@ -71,7 +71,7 @@ const MegafaunaObservationDetail = () => {
         <Card className="shadow-card">
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">Laporan Monitoring Pemanfaatan (RUM) tidak ditemukan.</p>
-            <Button className="mt-4" onClick={() => navigate('/monitoring-megafauna')}>
+            <Button className="mt-4" onClick={() => navigate('/monitoring-megafauna/list')}>
               Kembali ke Daftar
             </Button>
           </CardContent>
@@ -86,7 +86,7 @@ const MegafaunaObservationDetail = () => {
         variant="ghost"
         size="sm"
         className="mb-4 -ml-2"
-        onClick={() => navigate('/monitoring-megafauna')}
+        onClick={() => navigate('/monitoring-megafauna/list')}
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
         Kembali ke Daftar
